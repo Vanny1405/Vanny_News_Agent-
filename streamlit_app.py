@@ -1,47 +1,112 @@
 import streamlit as st
 import google.generativeai as genai
+import time
 
-# UI Setup
-st.set_page_config(page_title="KI News Agent Diagnose", page_icon="🕵️", layout="wide")
+# 1. UI SETUP & DESIGN
+st.set_page_config(
+    page_title="Vanny's News Agent", 
+    page_icon="🗞️", 
+    layout="wide"
+)
 
-# API Key laden
-api_key = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=api_key)
+# Custom CSS für einen moderneren Look
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        height: 3em;
+        background-color: #007bff;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.title("🤖 Modell-Diagnose & News-Agent")
-
-# --- DIAGNOSE SEKTION ---
-with st.expander("Modell-Liste anzeigen (Klicke hier, falls Fehler auftreten)"):
-    try:
-        available_models = [m.name.replace('models/', '') for m in genai.list_models() 
-                            if 'generateContent' in m.supported_generation_methods]
-        st.write("Diese Namen akzeptiert dein API-Key aktuell:")
-        st.code(available_models)
-    except Exception as e:
-        st.error(f"Fehler beim Abrufen der Liste: {e}")
-
-# --- AGENT SEKTION ---
-# Wähle hier einen Namen aus der Liste oben aus. 
-# Wir probieren jetzt mal den ganz schlichten Namen:
-model_id = 'gemini-1.5-flash' 
-
+# 2. API KONFIGURATION
+# Wir nutzen deinen Key aus den Streamlit Secrets
 try:
-    model = genai.GenerativeModel(
-        model_name=model_id,
-        tools=[{'google_search_retrieval': {}}]
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+except Exception:
+    st.error("API Key nicht gefunden! Bitte in den Streamlit-Settings unter 'Secrets' hinterlegen.")
+    st.stop()
+
+# Das Modell, das wir in deiner Liste gefunden haben (Stand 2026)
+MODEL_ID = 'gemini-3-flash-preview'
+
+# Initialisierung des Modells mit Google Search Tool
+model = genai.GenerativeModel(
+    model_name=MODEL_ID,
+    tools=[{'google_search_retrieval': {}}]
+)
+
+# 3. SIDEBAR (KONFIGURATION)
+with st.sidebar:
+    st.title("⚙️ Einstellungen")
+    st.info("Dein Agent nutzt Gemini 3 mit Echtzeit-Websuche.")
+    
+    fokus_themen = st.text_area(
+        "Spezifische Schwerpunkte:", 
+        "KI-Trends, Raumfahrt & E-Mobilität",
+        help="Trenne Themen mit Kommas."
     )
-    st.success(f"Aktuell konfiguriert: {model_id}")
-except Exception as e:
-    st.error(f"Fehler bei Initialisierung: {e}")
+    
+    st.divider()
+    st.caption("Status: Verbunden mit Gemini API")
+    
+    # Diagnose-Option (falls du mal die Modell-Liste brauchst)
+    with st.expander("System-Diagnose"):
+        if st.button("Verfügbare Modelle auflisten"):
+            models = [m.name for m in genai.list_models()]
+            st.code(models)
 
-fokus = st.text_input("Dein Schwerpunkt:", "KI & Technologie")
+# 4. HAUPTBEREICH
+st.title("🤖 Dein persönlicher News-Agent")
+st.write("Klicke auf den Button, um die Weltlage der letzten 8-12 Stunden zu analysieren.")
 
-if st.button("Echtzeit-Update generieren"):
-    with st.spinner('Suche läuft...'):
-        try:
-            prompt = f"Suche nach Top-News zu {fokus} der letzten 12 Stunden. Zusammenfassung mit Links."
-            response = model.generate_content(prompt)
-            st.markdown(response.text)
-        except Exception as e:
-            st.error(f"API-Fehler: {e}")
-            st.info("Falls oben '404' steht, kopiere einen Namen aus der Liste oben in den Code (Zeile 24).")
+if st.button("🚀 News-Update jetzt generieren"):
+    with st.spinner('Durchsuche das Internet und erstelle Zusammenfassungen...'):
+        
+        # Retry-Logik gegen den 429-Fehler (Quota exceeded)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Der Prompt für Gemini
+                prompt = f"""
+                Suche im Internet nach den wichtigsten Nachrichten der letzten 8-12 Stunden.
+                Erstelle einen übersichtlichen Bericht in Deutsch mit folgenden Sektionen:
+                
+                1. 🌍 **Globales Weltgeschehen**: Die 3 kritischsten Schlagzeilen.
+                2. 🔍 **Deep Dive Schwerpunkte**: Analysiere detailliert: {fokus_themen}.
+                
+                Formatierung:
+                - Nutze für jedes Thema eine ### Überschrift.
+                - Schreibe eine prägnante Zusammenfassung (2-3 Sätze).
+                - Füge am Ende jeder News einen Link zur Quelle ein: [👉 Mehr lesen](URL).
+                - Trenne die Sektionen mit --- Linien.
+                """
+                
+                response = model.generate_content(prompt)
+                
+                # Wenn wir hier ankommen, war es erfolgreich
+                st.markdown(response.text)
+                st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr.")
+                break # Schleife beenden
+                
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg:
+                    if attempt < max_retries - 1:
+                        st.warning(f"Limit erreicht. Ich warte kurz und probiere es erneut... (Versuch {attempt + 1}/{max_retries})")
+                        time.sleep(15) # 15 Sekunden warten
+                    else:
+                        st.error("Leider ist das API-Limit für heute erschöpft. Bitte probiere es in einer Stunde noch einmal.")
+                else:
+                    st.error(f"Ein Fehler ist aufgetreten: {e}")
+                    break
+
+st.divider()
+st.caption("Powered by Gemini 3 Flash & Streamlit Cloud • 2026")
