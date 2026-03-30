@@ -11,7 +11,7 @@ genai.configure(api_key=api_key)
 # Modell mit Google Search Tool initialisieren
 # Wir nutzen den Namen, den du im AI Studio gefunden hast!
 model = genai.GenerativeModel(
-    model_name='gemini-3-flash-preview',
+    model_name='gemini-1.5-flash', 
     tools=[{'google_search_retrieval': {}}]
 )
 
