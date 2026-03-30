@@ -34,19 +34,34 @@ except Exception:
     st.error("API Key nicht gefunden! Bitte in den Streamlit-Settings unter 'Secrets' hinterlegen.")
     st.stop()
 
-# Das Modell, das wir in deiner Liste gefunden haben (Stand 2026)
-MODEL_ID = 'gemini-3-flash-preview'
-
-# Initialisierung des Modells mit Google Search Tool
-model = genai.GenerativeModel(
-    model_name=MODEL_ID,
-    tools=[{'google_search_retrieval': {}}]
-)
+# Verfügbare Text/Search Modelle (gefiltert aus deiner Liste)
+VERFUEGBARE_MODELLE = [
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash'
+]
 
 # 3. SIDEBAR (KONFIGURATION)
 with st.sidebar:
     st.title("⚙️ Einstellungen")
-    st.info("Dein Agent nutzt Gemini 3 mit Echtzeit-Websuche.")
+    st.info("Wähle deine Modelle mit Echtzeit-Websuche.")
+
+    primaeres_modell = st.selectbox(
+        "Primäres Modell:",
+        VERFUEGBARE_MODELLE,
+        index=0,
+        help="Wird zuerst versucht."
+    )
+
+    fallback_modell = st.selectbox(
+        "Fallback Modell (bei Limit-Fehler):",
+        VERFUEGBARE_MODELLE,
+        index=1,
+        help="Wird genutzt, wenn das primäre Modell keine Quote mehr hat."
+    )
+
+    st.divider()
     
     fokus_themen = st.text_area(
         "Spezifische Schwerpunkte:", 
@@ -89,12 +104,19 @@ if st.button("🚀 News-Update jetzt generieren"):
             - Trenne die Sektionen mit --- Linien.
             """
 
-            progress_bar.progress(50, text='Generiere Antwort...')
+            # 1. Versuche das Primäre Modell
+            aktuelles_modell = primaeres_modell
+            model = genai.GenerativeModel(
+                model_name=aktuelles_modell,
+                tools=[{'google_search_retrieval': {}}]
+            )
+
+            progress_bar.progress(50, text=f'Generiere Antwort mit {aktuelles_modell}...')
             response = model.generate_content(prompt)
 
             # Wenn wir hier ankommen, war es erfolgreich
             st.markdown(response.text)
-            st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr.")
+            st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr. Verwendetes Modell: **{aktuelles_modell}**")
             progress_bar.progress(100, text='Abgeschlossen!')
             break # Schleife beenden
 
@@ -103,13 +125,36 @@ if st.button("🚀 News-Update jetzt generieren"):
             if "429" in error_msg:
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt) * 5
-                    st.warning(f"Limit erreicht. Ich warte {wait_time} Sekunden und probiere es erneut... (Versuch {attempt + 1}/{max_retries})")
+                    st.warning(f"Limit beim {aktuelles_modell} erreicht. Warte {wait_time}s... (Versuch {attempt + 1}/{max_retries})")
                     time.sleep(wait_time)
                 else:
-                    st.error("Leider ist das API-Limit für heute erschöpft. Bitte probiere es in einer Stunde noch einmal.")
+                    st.error(f"Limit beim {aktuelles_modell} komplett ausgeschöpft.")
+
+                    # 2. Aktiviere den Fallback!
+                    if primaeres_modell != fallback_modell:
+                        st.info(f"Wechsle jetzt zum Fallback-Modell: {fallback_modell}...")
+                        try:
+                            aktuelles_modell = fallback_modell
+                            fallback_agent = genai.GenerativeModel(
+                                model_name=aktuelles_modell,
+                                tools=[{'google_search_retrieval': {}}]
+                            )
+                            response = fallback_agent.generate_content(prompt)
+
+                            st.markdown(response.text)
+                            st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr über Fallback. Verwendetes Modell: **{aktuelles_modell}**")
+                            progress_bar.progress(100, text='Abgeschlossen mit Fallback!')
+                            break # Den gesamten Block erfolgreich beenden
+
+                        except Exception as fallback_e:
+                             st.error(f"Leider hat auch das Fallback-Modell ({fallback_modell}) einen Fehler geworfen: {fallback_e}")
+                             break
+                    else:
+                        st.error("Es wurde kein alternatives Fallback-Modell konfiguriert. Bitte probiere es später noch einmal.")
+                        break
             else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
                 break
 
 st.divider()
-st.caption("Powered by Gemini 3 Flash & Streamlit Cloud • 2026")
+st.caption("Powered by Gemini Models & Streamlit Cloud • 2026")
