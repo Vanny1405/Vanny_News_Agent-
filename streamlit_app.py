@@ -2,72 +2,46 @@ import streamlit as st
 import google.generativeai as genai
 
 # UI Setup
-st.set_page_config(page_title="KI News Agent Pro", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="KI News Agent Diagnose", page_icon="🕵️", layout="wide")
 
-# API Key sicher laden
+# API Key laden
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
-# Modell mit Google Search Tool initialisieren
-# Wir nutzen den Namen, den du im AI Studio gefunden hast!
-# Versuche das stabilste Modell zu laden
+st.title("🤖 Modell-Diagnose & News-Agent")
+
+# --- DIAGNOSE SEKTION ---
+with st.expander("Modell-Liste anzeigen (Klicke hier, falls Fehler auftreten)"):
+    try:
+        available_models = [m.name.replace('models/', '') for m in genai.list_models() 
+                            if 'generateContent' in m.supported_generation_methods]
+        st.write("Diese Namen akzeptiert dein API-Key aktuell:")
+        st.code(available_models)
+    except Exception as e:
+        st.error(f"Fehler beim Abrufen der Liste: {e}")
+
+# --- AGENT SEKTION ---
+# Wähle hier einen Namen aus der Liste oben aus. 
+# Wir probieren jetzt mal den ganz schlichten Namen:
+model_id = 'gemini-1.5-flash' 
+
 try:
-    # Wir probieren erst die "Latest"-Variante, die ist am sichersten
-    model_id = 'gemini-1.5-flash-latest' 
     model = genai.GenerativeModel(
         model_name=model_id,
         tools=[{'google_search_retrieval': {}}]
     )
-    # Test-Aufruf um sicherzugehen, dass das Modell existiert
-    st.sidebar.success(f"Aktiv: {model_id}")
-except Exception:
-    try:
-        # Falls das fehlschlägt, nehmen wir das, was du im AI Studio gesehen hast
-        model_id = 'gemini-3-flash-preview'
-        model = genai.GenerativeModel(
-            model_name=model_id,
-            tools=[{'google_search_retrieval': {}}]
-        )
-        st.sidebar.warning(f"Nutze Preview: {model_id}")
-    except Exception as e:
-        st.error("Konnte kein passendes Modell finden.")
-        # Dieser Teil listet dir alle verfügbaren Modelle in der App auf, 
-        # damit wir den Namen schwarz auf weiß sehen:
-        st.write("Verfügbare Modelle für dich:")
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        st.write(models)
+    st.success(f"Aktuell konfiguriert: {model_id}")
+except Exception as e:
+    st.error(f"Fehler bei Initialisierung: {e}")
 
-st.title("🤖 Dein Profi News-Agent")
-st.subheader("Echtzeit-Analyse powered by Google Search")
-
-# Seitenleiste für Einstellungen
-with st.sidebar:
-    st.header("Konfiguration")
-    fokus = st.text_input("Zusätzliches Schwerpunktthema:", "Raumfahrt & E-Mobilität")
-    st.info("Dein Agent sucht jetzt live im Netz, ohne auf starre Feeds angewiesen zu sein.")
+fokus = st.text_input("Dein Schwerpunkt:", "KI & Technologie")
 
 if st.button("Echtzeit-Update generieren"):
-    with st.spinner('Durchsuche das Internet nach den aktuellsten News...'):
-        prompt = f"""
-        Suche nach den wichtigsten globalen News der letzten 8 Stunden.
-        Erstelle eine strukturierte Zusammenfassung in folgenden Kategorien:
-        1. 🌍 **Top Weltgeschehen** (Die 3 wichtigsten Meldungen)
-        2. 💻 **Tech & KI Fokus** (Aktuelle Trends)
-        3. 🎯 **Dein Schwerpunkt: {fokus}**
-        
-        Wichtig:
-        - Sei prägnant.
-        - Füge für jede News einen direkten Quellen-Link ein.
-        - Nutze Markdown-Trennlinien zwischen den Sektionen.
-        """
-        
+    with st.spinner('Suche läuft...'):
         try:
+            prompt = f"Suche nach Top-News zu {fokus} der letzten 12 Stunden. Zusammenfassung mit Links."
             response = model.generate_content(prompt)
             st.markdown(response.text)
-            
-            st.success("Bericht erfolgreich erstellt!")
         except Exception as e:
-            st.error(f"Da ist etwas schiefgelaufen: {e}")
-
-st.divider()
-st.caption("Datenquelle: Live Google Search via Gemini 3 API")
+            st.error(f"API-Fehler: {e}")
+            st.info("Falls oben '404' steht, kopiere einen Namen aus der Liste oben in den Code (Zeile 24).")
