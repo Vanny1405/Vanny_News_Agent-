@@ -10,10 +10,32 @@ genai.configure(api_key=api_key)
 
 # Modell mit Google Search Tool initialisieren
 # Wir nutzen den Namen, den du im AI Studio gefunden hast!
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash', 
-    tools=[{'google_search_retrieval': {}}]
-)
+# Versuche das stabilste Modell zu laden
+try:
+    # Wir probieren erst die "Latest"-Variante, die ist am sichersten
+    model_id = 'gemini-1.5-flash-latest' 
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        tools=[{'google_search_retrieval': {}}]
+    )
+    # Test-Aufruf um sicherzugehen, dass das Modell existiert
+    st.sidebar.success(f"Aktiv: {model_id}")
+except Exception:
+    try:
+        # Falls das fehlschlägt, nehmen wir das, was du im AI Studio gesehen hast
+        model_id = 'gemini-3-flash-preview'
+        model = genai.GenerativeModel(
+            model_name=model_id,
+            tools=[{'google_search_retrieval': {}}]
+        )
+        st.sidebar.warning(f"Nutze Preview: {model_id}")
+    except Exception as e:
+        st.error("Konnte kein passendes Modell finden.")
+        # Dieser Teil listet dir alle verfügbaren Modelle in der App auf, 
+        # damit wir den Namen schwarz auf weiß sehen:
+        st.write("Verfügbare Modelle für dich:")
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        st.write(models)
 
 st.title("🤖 Dein Profi News-Agent")
 st.subheader("Echtzeit-Analyse powered by Google Search")
