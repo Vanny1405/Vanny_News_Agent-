@@ -8,7 +8,7 @@ st.set_page_config(page_title="KI News Agent", page_icon="📰", layout="wide")
 # API Key sicher laden
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-3-flash-preview')
 
 st.title("🤖 Dein persönlicher News-Agent")
 
@@ -20,18 +20,17 @@ def get_news():
 if st.button("News-Update jetzt generieren"):
     with st.spinner('Analysiere Weltlage...'):
         headlines = get_news()
-        prompt = f"""
-        Du bist ein News-Agent. Hier sind aktuelle Schlagzeilen: {headlines}
         
-        Erstelle eine visuell ansprechende Zusammenfassung:
-        1. **Welt-News**: Die 3 wichtigsten globalen Ereignisse.
-        2. **Fokus-Themen**: Analysiere spezifisch [KI, Tech, Wirtschaft].
-        
-        Nutze für jeden News-Punkt folgendes Format:
-        ### [Titel des Themas]
-        - **Zusammenfassung**: Ein prägnanter Satz.
-        - [👉 Mehr erfahren](Link aus den Daten einfügen)
-        ---
-        """
-        response = model.generate_content(prompt)
-        st.markdown(response.text)
+        if not headlines:
+            st.error("Konnte keine News abrufen. Versuche es in ein paar Minuten noch einmal.")
+        else:
+            prompt = f"""
+            Analysiere diese Schlagzeilen: {headlines}
+            Erstelle eine visuelle Zusammenfassung mit Welt-News und Schwerpunkten (KI, Tech, Wirtschaft).
+            Nutze Markdown-Überschriften und Emojis.
+            """
+            try:
+                response = model.generate_content(prompt)
+                st.markdown(response.text)
+            except Exception as e:
+                st.error(f"Fehler bei der KI-Generierung: {e}")
