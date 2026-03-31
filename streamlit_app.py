@@ -88,54 +88,79 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 2. API KONFIGURATION
+# Wir nutzen deinen Key aus den Streamlit Secrets
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except Exception:
-    st.error("API Key nicht gefunden! Bitte in den Secrets hinterlegen.")
+    st.error("API Key nicht gefunden! Bitte in den Streamlit-Settings unter 'Secrets' hinterlegen.")
     st.stop()
 
 # 3. RSS FEED DEFINITION & ABFRAGE
 NEWS_CLUSTERS = {
-    "🌍 Weltnews": {
-        "description": "USA, China, Europa.",
-        "feed_url": "https://www.tagesschau.de/xml/rss2/",
-        "icon": "🌐"
+    "Weltnews (Global & Top DE)": {
+        "description": "Wichtige globale Ereignisse.",
+        "feeds": [
+            "https://www.tagesschau.de/infosprecher/index~rss2.xml",
+            "https://www.zdf.de/rss/zdf/nachrichten",
+            "http://feeds.bbci.co.uk/news/world/rss.xml"
+        ],
+        "icon": "🌍"
     },
-    "🤖 KI-Giganten": {
-        "description": "Google, Microsoft, SAP, OpenAI.",
-        "feed_url": "https://www.heise.de/rss/heise-atom.xml",
-        "icon": "🚀"
+    "KI-Giganten (Google, OpenAI, MSFT)": {
+        "description": "Die neuesten Entwicklungen in der KI.",
+        "feeds": [
+            "https://www.heise.de/rss/heise-atom.xml",
+            "https://openai.com/news/rss.xml",
+            "https://blog.google/technology/ai/rss/",
+            "https://techcrunch.com/category/artificial-intelligence/feed/"
+        ],
+        "icon": "🤖"
     },
-    "🇩🇪 DE im Ausland": {
-        "description": "Wie berichten andere über DE?",
-        "feed_url": "https://news.google.com/rss/search?q=Germany&hl=en-US&gl=US&ceid=US:en",
-        "icon": "👁️"
+    "Wirtschaft & Spiegel der Weltpresse": {
+        "description": "Wirtschaftsnachrichten und internationale Perspektiven.",
+        "feeds": [
+            "https://www.spiegel.de/wirtschaft/index.rss",
+            "https://www.manager-magazin.de/index.rss",
+            "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/europe/rss.xml"
+        ],
+        "icon": "🇩🇪"
     },
-    "🥨 Lokal-Fokus BW": {
-        "description": "Wirtschaft & Umwelt in Baden-Württemberg.",
-        "feed_url": "https://www.swr.de/~rss/swraktuell/baden-wuerttemberg/swraktuell-bw-100.xml",
+    "BW-Lokal, Raumfahrt & E-Mobilität": {
+        "description": "Lokalnachrichten aus BW, Weltraumforschung und Elektromobilität.",
+        "feeds": [
+            "https://www.swr.de/swraktuell/baden-wuerttemberg/index~rss2.xml",
+            "https://www.esa.int/rssfeed/Our_Missions",
+            "https://electrek.co/feed/"
+        ],
         "icon": "🏭"
     }
 }
 
-@st.cache_data(ttl=900) # Cache für 15 Minuten um API/Bandbreite zu schonen
-def fetch_rss_headlines(feed_url, limit=4):
-    """Holt die aktuellsten Schlagzeilen aus einem RSS Feed."""
-    try:
-        feed = feedparser.parse(feed_url)
-        entries = feed.entries[:limit]
-        headlines = [f"• {entry.title}" for entry in entries]
-        return "\n".join(headlines) if headlines else "Keine aktuellen Meldungen gefunden."
-    except Exception as e:
-        return f"Fehler beim Laden des Feeds: {str(e)}"
+@st.cache_data(ttl=900)
+def fetch_aggregated_rss_data(feeds, limit_per_feed=3):
+    """Holt Schlagzeilen aus mehreren RSS Feeds und fasst sie als Liste von dicts zusammen."""
+    aggregated_entries = []
+    for feed_url in feeds:
+        try:
+            feed = feedparser.parse(feed_url)
+            # Begrenze die Anzahl der Einträge pro Feed, um eine bunte Mischung zu erhalten (z.B. max 3)
+            # Insgesamt streben wir 5-8 Einträge pro Cluster an.
+            for entry in feed.entries[:limit_per_feed]:
+                title = entry.get('title', 'Ohne Titel')
+                link = entry.get('link', '#')
+                aggregated_entries.append({"title": title, "link": link})
+        except Exception:
+            pass # Fehlerhafte Feeds überspringen
 
-# Verfügbare Text/Search Modelle
+    return aggregated_entries
+
+# Verfügbare Text Modelle
 VERFUEGBARE_MODELLE = [
-    'gemini-2.0-flash', # Default
+    'gemini-3.1-flash-lite', # Default laut Auftrag
+    'gemini-3-flash-preview',
     'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-3-flash-preview'
+    'gemini-2.0-flash'
 ]
 
 # State für Detail-Ansicht
@@ -147,10 +172,21 @@ if 'last_analysis_result' not in st.session_state:
 # 4. SIDEBAR (KONFIGURATION)
 with st.sidebar:
     st.title("⚙️ Einstellungen")
-    st.info("Dieser Agent nutzt stabile RSS-Feeds statt der Google-Suche.")
+    st.info("Wähle deine Modelle für die KI-Zusammenfassung.")
 
-    primaeres_modell = st.selectbox("Primäres Modell:", VERFUEGBARE_MODELLE, index=0)
-    fallback_modell = st.selectbox("Fallback Modell:", VERFUEGBARE_MODELLE, index=2)
+    primaeres_modell = st.selectbox(
+        "Primäres Modell:",
+        VERFUEGBARE_MODELLE,
+        index=0,
+        help="Wird zuerst versucht."
+    )
+
+    fallback_modell = st.selectbox(
+        "Fallback Modell (bei Limit-Fehler):",
+        VERFUEGBARE_MODELLE,
+        index=1,
+        help="Wird genutzt, wenn das primäre Modell keine Quote mehr hat."
+    )
 
     st.divider()
 
@@ -183,156 +219,108 @@ st.markdown(f"""
 # Grid Layout: 2 Spalten
 col1, col2 = st.columns(2)
 
+@st.cache_data(ttl=900)
+def generate_cluster_summary(cluster_name, rss_data, model_name):
+    """
+    Nutzt Gemini um die reinen RSS Daten ins Deutsche zu übersetzen
+    und 5 prägnante Bulletpoints zu generieren.
+    """
+    if not rss_data:
+        return "Keine aktuellen Nachrichten verfügbar."
+
+    rss_text = "\n".join([f"- {item['title']} (URL: {item['link']})" for item in rss_data])
+
+    prompt = f"""
+    Du bist ein erstklassiger Executive Assistant. Deine Aufgabe ist es, die folgenden internationalen und nationalen Schlagzeilen für das Dashboard-Modul '{cluster_name}' zusammenzufassen.
+
+    AUFGABE:
+    1. Übersetze alle englischsprachigen oder fremdsprachigen Schlagzeilen in professionelles Deutsch.
+    2. Erstelle exakt 5 prägnante, aussagekräftige Bullet Points, die die wichtigsten Entwicklungen aus den Rohdaten zusammenfassen.
+    3. Verwende HTML-Listen (`<ul><li>...</li></ul>`), damit die Ausgabe sauber im Dashboard formatiert ist.
+    4. KEINE Links in den Bulletpoints! Links werden später in der Detailansicht angezeigt.
+    5. Schreibe keinen Einleitungssatz, sondern starte direkt mit der HTML-Liste.
+
+    ROHDATEN (RSS-Schlagzeilen):
+    {rss_text}
+    """
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            model = genai.GenerativeModel(model_name=model_name) # KEIN google_search_retrieval Tool hier!
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            if "429" in str(e):
+                if attempt < max_retries - 1:
+                    time.sleep((2 ** attempt) * 5)
+                else:
+                    return f"API-Limit ({model_name}) nach Retries erreicht. Fallback benötigt."
+            else:
+                 return f"Fehler bei der KI-Analyse: {str(e)}"
+
 # Funktion um Bento Cards zu rendern
-def render_bento_card(cluster_name, cluster_data, col):
+def render_bento_card(cluster_name, cluster_data, col, primary_model, fallback_model):
     with col:
-        # Fetch headlines (cached, so it's fast and free)
-        headlines_raw = fetch_rss_headlines(cluster_data["feed_url"])
-        headlines_html = headlines_raw.replace("\n", "<br>")
+        # 1. Fetch RAW RSS Data
+        rss_data = fetch_aggregated_rss_data(cluster_data["feeds"])
+
+        # 2. Generiere KI Zusammenfassung (Caches über @st.cache_data in der Funktion)
+        summary_html = generate_cluster_summary(cluster_name, rss_data, primary_model)
+
+        # Basic Fallback check inside the card generator if primary fails with 429
+        if "Fallback benötigt" in summary_html and primary_model != fallback_model:
+            summary_html = generate_cluster_summary(cluster_name, rss_data, fallback_model)
 
         # Rendere die Bento-Box als zusammenhängendes HTML-Block
         bento_html = f"""
         <div class="bento-card">
             <div class="cluster-title">{cluster_data["icon"]} {cluster_name}</div>
-            <div class="cluster-content">{headlines_html}</div>
+            <div class="cluster-content">{summary_html}</div>
         </div>
         """
         st.markdown(bento_html, unsafe_allow_html=True)
 
         # Deep Dive Button sitzt regulär darunter, damit er klickbar bleibt
-        if st.button(f"🔍 Deep Dive", key=f"btn_{cluster_name}"):
-            # Nur resetten, wenn sich das Cluster wirklich ändert, spart API Calls!
+        if st.button(f"🔍 Details", key=f"btn_{cluster_name}"):
             if st.session_state.active_cluster != cluster_name:
                 st.session_state.active_cluster = cluster_name
                 st.session_state.last_analysis_result = None
 
 # Rendern der 4 Cluster-Karten
 clusters_list = list(NEWS_CLUSTERS.items())
-render_bento_card(clusters_list[0][0], clusters_list[0][1], col1)
-render_bento_card(clusters_list[1][0], clusters_list[1][1], col2)
-render_bento_card(clusters_list[2][0], clusters_list[2][1], col1)
-render_bento_card(clusters_list[3][0], clusters_list[3][1], col2)
+with st.spinner('Führe KI-Analyse für das Dashboard aus (Modelle übersetzen & aggregieren RSS-Feeds)...'):
+    render_bento_card(clusters_list[0][0], clusters_list[0][1], col1, primaeres_modell, fallback_modell)
+    render_bento_card(clusters_list[1][0], clusters_list[1][1], col2, primaeres_modell, fallback_modell)
+    render_bento_card(clusters_list[2][0], clusters_list[2][1], col1, primaeres_modell, fallback_modell)
+    render_bento_card(clusters_list[3][0], clusters_list[3][1], col2, primaeres_modell, fallback_modell)
 
 st.divider()
 
 # Platzhalter für die Detail-Ansicht oder den alten Button
-st.subheader("Detail-Analyse")
+st.subheader("📰 Deep Dive & Original-Quellen")
 if not st.session_state.active_cluster:
-    st.info("Klicke auf 'Deep Dive' in einem der Cluster oben oder suche ein eigenes Thema in der Seitenleiste, um eine KI-gestützte Analyse der aktuellen Themen zu generieren.")
+    st.info("Klicke auf 'Details' in einem der Cluster oben, um die Original-Schlagzeilen und Quell-Links einzusehen.")
 
 if st.session_state.active_cluster:
     active_topic = st.session_state.active_cluster
+    st.markdown(f"#### Rohdaten für: **{active_topic}**")
 
-    st.markdown(f"### 🤖 Analyse für: **{active_topic}**")
-
-    # Render cached result if available to save API quota on reruns
-    if st.session_state.last_analysis_result:
-        st.markdown(st.session_state.last_analysis_result["text"])
-        st.success(f"Aus dem Cache geladen. Verwendetes Modell: **{st.session_state.last_analysis_result['model']}**")
+    if "Eigene Suche" in active_topic:
+         st.warning("Die Detailansicht für die Eigene Suche ist noch in Entwicklung. Bitte wähle ein vorgefertigtes Cluster für Deep Dives.")
     else:
-        progress_bar = st.progress(0, text='Initialisiere KI Agenten...')
+        # Finde das ausgewählte Cluster
+        selected_cluster_data = NEWS_CLUSTERS.get(active_topic)
+        if selected_cluster_data:
+            # Hole die (bereits gecacheten) RSS Daten nochmal
+            rss_data = fetch_aggregated_rss_data(selected_cluster_data["feeds"], limit_per_feed=5)
 
-        # Retry-Logik gegen den 429-Fehler (Quota exceeded)
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # Bereite Kontext für den Prompt vor
-                rss_context = ""
-                if "Eigene Suche" in active_topic:
-                    suchbegriff = active_topic.replace("Eigene Suche: ", "")
-                    prompt_topic = f"Spezifische Recherche zum Thema: {suchbegriff}"
-                else:
-                    prompt_topic = f"Executive Summary für das Themenfeld: {active_topic}"
-                    # Hole den spezifischen RSS-Feed für den aktiven Cluster als Kontext
-                    for cluster_name, cluster_data in NEWS_CLUSTERS.items():
-                        if cluster_name == active_topic:
-                            feed_content = fetch_rss_headlines(cluster_data["feed_url"], limit=10)
-                            rss_context = f"\n\n**Aktuelle RSS-Schlagzeilen als Basis-Kontext:**\n{feed_content}"
-                            break
-
-                prompt = f"""
-                Erstelle einen übersichtlichen, professionellen Executive News Report in Deutsch.
-                Konzentriere dich auf das folgende Cluster/Thema: {prompt_topic}
-
-                Beziehe dich primär auf diese aktuellen Schlagzeilen (falls vorhanden) und ergänze sie durch dein eigenes Wissen oder Websuchen, um tiefergehende Informationen zu liefern:{rss_context}
-
-                Aufbau:
-                1. 📊 **Executive Summary**: 2-3 Sätze, die die generelle Nachrichtenlage in diesem Themenbereich zusammenfassen.
-                2. 📰 **Top 3 Schlagzeilen & Deep Dive**:
-                   - Nutze für jede Headline eine ### Überschrift.
-                   - Schreibe eine prägnante Zusammenfassung (2-3 Sätze) zu jeder der Top 3 Nachrichten.
-                   - WICHTIG: Füge am Ende jeder News zwingend einen direkten Link zur Quelle ein: [👉 Quelle](URL).
-                3. 💡 **Management Takeaway**: Was bedeutet das konkret für Entscheidungsträger? (1 Satz)
-
-                Trennzeichen:
-                - Trenne die 3 Schlagzeilen-Sektionen optisch sauber mit --- Linien.
-                """
-
-                # 1. Versuche das Primäre Modell
-                aktuelles_modell = primaeres_modell
-                model = genai.GenerativeModel(
-                    model_name=aktuelles_modell,
-                    tools=[{'google_search_retrieval': {}}]
-                )
-
-                progress_bar.progress(50, text=f'Generiere Antwort mit {aktuelles_modell}...')
-                response = model.generate_content(prompt)
-
-                # Wenn wir hier ankommen, war es erfolgreich
-                st.markdown(response.text)
-                st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr. Verwendetes Modell: **{aktuelles_modell}**")
-
-                # Cachen für spätere Streamlit Reruns
-                st.session_state.last_analysis_result = {
-                    "text": response.text,
-                    "model": aktuelles_modell
-                }
-
-                progress_bar.progress(100, text='Abgeschlossen!')
-                break # Schleife beenden
-
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg:
-                    if attempt < max_retries - 1:
-                        wait_time = (2 ** attempt) * 5
-                        st.warning(f"Limit beim {aktuelles_modell} erreicht. Warte {wait_time}s... (Versuch {attempt + 1}/{max_retries})")
-                        time.sleep(wait_time)
-                    else:
-                        st.error(f"Limit beim {aktuelles_modell} komplett ausgeschöpft.")
-
-                        # 2. Aktiviere den Fallback!
-                        if primaeres_modell != fallback_modell:
-                            st.info(f"Wechsle jetzt zum Fallback-Modell: {fallback_modell}...")
-                            try:
-                                aktuelles_modell = fallback_modell
-                                fallback_agent = genai.GenerativeModel(
-                                    model_name=aktuelles_modell,
-                                    tools=[{'google_search_retrieval': {}}]
-                                )
-                                response = fallback_agent.generate_content(prompt)
-
-                                st.markdown(response.text)
-                                st.success(f"Update abgeschlossen um {time.strftime('%H:%M:%S')} Uhr über Fallback. Verwendetes Modell: **{aktuelles_modell}**")
-
-                                # Cachen für spätere Streamlit Reruns
-                                st.session_state.last_analysis_result = {
-                                    "text": response.text,
-                                    "model": aktuelles_modell
-                                }
-
-                                progress_bar.progress(100, text='Abgeschlossen mit Fallback!')
-                                break # Den gesamten Block erfolgreich beenden
-
-                            except Exception as fallback_e:
-                                 st.error(f"Leider hat auch das Fallback-Modell ({fallback_modell}) einen Fehler geworfen: {fallback_e}")
-                                 break
-                        else:
-                            st.error("Es wurde kein alternatives Fallback-Modell konfiguriert. Bitte probiere es später noch einmal.")
-                            break
-                else:
-                    st.error(f"Ein Fehler ist aufgetreten: {e}")
-                    break
+            if rss_data:
+                for item in rss_data:
+                    # Clean up the output using Streamlit elements
+                    st.markdown(f"🔗 **[{item['title']}]({item['link']})**")
+            else:
+                st.info("Keine Rohdaten für dieses Cluster gefunden.")
 
 st.divider()
-st.caption("Datenquelle: Google News & Tagesschau RSS • 2026")
+st.caption("Powered by Gemini Models & Streamlit Cloud • 2026")
