@@ -88,12 +88,11 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 2. API KONFIGURATION
-# Wir nutzen deinen Key aus den Streamlit Secrets
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except Exception:
-    st.error("API Key nicht gefunden! Bitte in den Streamlit-Settings unter 'Secrets' hinterlegen.")
+    st.error("API Key nicht gefunden! Bitte in den Secrets hinterlegen.")
     st.stop()
 
 # 3. RSS FEED DEFINITION & ABFRAGE
@@ -148,21 +147,10 @@ if 'last_analysis_result' not in st.session_state:
 # 4. SIDEBAR (KONFIGURATION)
 with st.sidebar:
     st.title("⚙️ Einstellungen")
-    st.info("Wähle deine Modelle mit Echtzeit-Websuche.")
+    st.info("Dieser Agent nutzt stabile RSS-Feeds statt der Google-Suche.")
 
-    primaeres_modell = st.selectbox(
-        "Primäres Modell:",
-        VERFUEGBARE_MODELLE,
-        index=0,
-        help="Wird zuerst versucht."
-    )
-
-    fallback_modell = st.selectbox(
-        "Fallback Modell (bei Limit-Fehler):",
-        VERFUEGBARE_MODELLE,
-        index=1,
-        help="Wird genutzt, wenn das primäre Modell keine Quote mehr hat."
-    )
+    primaeres_modell = st.selectbox("Primäres Modell:", VERFUEGBARE_MODELLE, index=0)
+    fallback_modell = st.selectbox("Fallback Modell:", VERFUEGBARE_MODELLE, index=2)
 
     st.divider()
 
@@ -347,4 +335,4 @@ if st.session_state.active_cluster:
                     break
 
 st.divider()
-st.caption("Powered by Gemini Models & Streamlit Cloud • 2026")
+st.caption("Datenquelle: Google News & Tagesschau RSS • 2026")
