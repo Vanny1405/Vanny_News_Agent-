@@ -155,12 +155,11 @@ def fetch_aggregated_rss_data(feeds, limit_per_feed=3):
 
     return aggregated_entries
 
-# Verfügbare Text Modelle
 VERFUEGBARE_MODELLE = [
-    'gemini-3.1-flash-lite', # Default
-    'gemini-3-flash-preview',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash'
+    'gemini-3.1-flash-lite-preview',  # 500 Anfragen/Tag - Dein Haupt-Modell
+    'gemini-2.5-flash-lite',         # 20 Anfragen/Tag - Stabilster Fallback
+    'gemini-3-flash-preview',        # 20 Anfragen/Tag - Falls 3.1 mal hakt
+    'gemini-2.5-flash'               # Letzte Reserve
 ]
 
 # State für Detail-Ansicht
