@@ -157,7 +157,7 @@ def fetch_aggregated_rss_data(feeds, limit_per_feed=3):
 
 # Verfügbare Text Modelle
 VERFUEGBARE_MODELLE = [
-    'gemini-3.1-flash-lite', # Default laut Auftrag
+    'gemini-3.1-flash-lite', # Default
     'gemini-3-flash-preview',
     'gemini-2.5-flash',
     'gemini-2.0-flash'
