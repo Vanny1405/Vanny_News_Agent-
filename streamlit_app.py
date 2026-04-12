@@ -171,7 +171,7 @@ if 'last_analysis_result' not in st.session_state:
 
 # 4. SIDEBAR (NAVIGATION & KONFIGURATION)
 with st.sidebar:
-    st.title("🧭 Navigation")
+    st.title("🧭 Navigator")    
     app_mode = st.radio("Wähle ein Modul:", ["📰 News-Monitor", "🧠 Brain Training"])
 
     st.divider()
