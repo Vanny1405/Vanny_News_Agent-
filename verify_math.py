@@ -21,12 +21,10 @@ def verify():
         time.sleep(3)
 
         # Focus first result input via DOM manipulation instead of tab if tab is flaky
-        # For Leicht multiplication (3 digit * 1 digit), the result is up to 4 digits.
-        # We fill '1', '2', '3', '4' in the result boxes.
-        inputs = page.locator('input[type="text"]').all()
-        # Find exactly the ones associated with 'result_' keys by filling them directly.
-        # Wait, since there are no intermediate rows for Leicht * 1 digit,
-        # all text inputs are result fields!
+        # We fill the bottom result boxes. Wait, the layout changed!
+        # Now there are Merkzahlen, intermediate steps, and the result row.
+        # Let's fill ONLY the result inputs to check if the empty check works.
+        inputs = page.locator('input[aria-label^="res_"]').all()
 
         for i, inp in enumerate(inputs):
             inp.fill(str(i+1))
