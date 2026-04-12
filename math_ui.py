@@ -73,11 +73,20 @@ def render_math_grid():
             min-width: 3rem !important;
             padding: 0 4px !important;
         }
+        /* Merkzahlen styling */
+        input[aria-label^="merk_"] {
+            transform: scale(0.6);
+            transform-origin: bottom center;
+            height: 2rem !important;
+            margin-bottom: -10px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     # Store layout direction for JS
     js_direction = 'rtl' if task_type == 'mul' else 'ltr'
+
+    game_id = st.session_state.math_game_id
 
     with st.container():
         st.markdown("<div class='math-container'>", unsafe_allow_html=True)
@@ -96,13 +105,13 @@ def render_math_grid():
                 cols_merk = st.columns(max_cols)
                 for i in range(max_cols):
                     with cols_merk[i]:
-                        st.text_input(f"merk_{step}_{i}", key=f"merk_{step}_{i}", max_chars=1, label_visibility="collapsed", help="Merkzahl")
+                        st.text_input(f"merk_{step}_{i}_{game_id}", key=f"merk_{step}_{i}_{game_id}", max_chars=1, label_visibility="collapsed", help="Merkzahl")
 
                 # The actual intermediate calculation step
                 cols_step = st.columns(max_cols)
                 for i in range(max_cols):
                     with cols_step[i]:
-                        st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
+                        st.text_input(f"step_{step}_{i}_{game_id}", key=f"step{step}_{i}_{game_id}", max_chars=1, label_visibility="collapsed")
 
             if num_steps > 1:
                 # Add a final carry row for the addition phase before the result
@@ -110,7 +119,7 @@ def render_math_grid():
                 cols_add_merk = st.columns(max_cols)
                 for i in range(max_cols):
                     with cols_add_merk[i]:
-                        st.text_input(f"merk_add_{i}", key=f"merk_add_{i}", max_chars=1, label_visibility="collapsed", help="Übertrag für Addition")
+                        st.text_input(f"merk_add_{i}_{game_id}", key=f"merk_add_{i}_{game_id}", max_chars=1, label_visibility="collapsed", help="Übertrag für Addition")
                 st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
 
             # Result row
@@ -121,7 +130,7 @@ def render_math_grid():
                 with cols_res[i]:
                     if i >= offset:
                         res_idx = i - offset
-                        st.text_input(f"res_{res_idx}", key=f"result_{res_idx}", max_chars=1, label_visibility="collapsed")
+                        st.text_input(f"res_{res_idx}_{game_id}", key=f"result_{res_idx}_{game_id}", max_chars=1, label_visibility="collapsed")
                     else:
                         st.empty()
 
@@ -134,7 +143,7 @@ def render_math_grid():
                 st.markdown(f"<div class='task-text' style='justify-content: flex-start;'>{n1_str} ÷ {n2_str} =</div>", unsafe_allow_html=True)
             for i in range(ans_digits):
                 with top_cols[i+1]:
-                    st.text_input(f"res_{i}", key=f"result_{i}", max_chars=1, label_visibility="collapsed")
+                    st.text_input(f"res_{i}_{game_id}", key=f"result_{i}_{game_id}", max_chars=1, label_visibility="collapsed")
 
             # Scratchpad (Treppenform)
             num_steps = len(n1_str) * 2
@@ -153,7 +162,7 @@ def render_math_grid():
 
                 for i in range(max_cols):
                     with cols_step[i+1]:
-                        st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
+                        st.text_input(f"step_{step}_{i}_{game_id}", key=f"step{step}_{i}_{game_id}", max_chars=1, label_visibility="collapsed")
                 # Add line after subtractions
                 if step % 2 == 1 and step < num_steps - 1:
                     st.markdown("<div class='hr-line' style='width: 60%; margin-left: 0;'></div>", unsafe_allow_html=True)
@@ -162,23 +171,80 @@ def render_math_grid():
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Inject JavaScript for Auto-Focus
+    # Inject JavaScript for Operation-Specific Focus Flow
     js_code = f"""
     <script>
-    const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
+    const inputs = Array.from(window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])'));
 
-    inputs.forEach((input, index) => {{
+    function jumpToNext(input, direction) {{
+        // We only care about jumping logic for step and merk fields if needed
+        // For standard "res_" fields at the bottom or basic inputs, use normal directional hopping
+        const label = input.getAttribute('aria-label') || "";
+
+        let targetLabel = "";
+
+        if (direction === 'rtl') {{
+            // Multiplication: step_X_Y -> merk_X_Y -> step_X_(Y-1)
+            if (label.startsWith("step_")) {{
+                let parts = label.split("_");
+                // parts = ["step", step_idx, col_idx, game_id]
+                targetLabel = `merk_${{parts[1]}}_${{parts[2]}}_${{parts[3]}}`;
+            }} else if (label.startsWith("merk_add_")) {{
+                // Skip to left merk_add_
+                let parts = label.split("_");
+                // ["merk", "add", col_idx, game_id]
+                targetLabel = `merk_add_${{parseInt(parts[2]) - 1}}_${{parts[3]}}`;
+            }} else if (label.startsWith("merk_")) {{
+                let parts = label.split("_");
+                // parts = ["merk", step_idx, col_idx, game_id]
+                targetLabel = `step_${{parts[1]}}_${{parseInt(parts[2]) - 1}}_${{parts[3]}}`;
+            }} else if (label.startsWith("res_")) {{
+                let parts = label.split("_");
+                targetLabel = `res_${{parseInt(parts[1]) - 1}}_${{parts[2]}}`;
+            }}
+        }} else {{
+            // Division: step_X_Y -> merk_X_Y -> step_X_(Y+1) (Note: div has no merk currently, so just LTR)
+            let currentIndex = inputs.indexOf(input);
+            if (currentIndex >= 0 && currentIndex + 1 < inputs.length) {{
+                let nextInput = inputs[currentIndex + 1];
+                if (nextInput) nextInput.focus();
+                return;
+            }}
+        }}
+
+        if (targetLabel) {{
+            let nextInput = inputs.find(i => i.getAttribute('aria-label') === targetLabel);
+            if (nextInput) {{
+                nextInput.focus();
+            }} else {{
+                // Fallback to strict RTL index based jump if target not found (e.g. at edges)
+                let currentIndex = inputs.indexOf(input);
+                if (currentIndex - 1 >= 0) {{
+                    inputs[currentIndex - 1].focus();
+                }}
+            }}
+        }}
+    }}
+
+    inputs.forEach((input) => {{
         if (!input.dataset.listenerAttached) {{
             input.dataset.listenerAttached = 'true';
+
+            // Auto jump on type (if character entered)
             input.addEventListener('input', function(e) {{
                 if (this.value.length >= 1) {{
-                    let nextIndex = '{js_direction}' === 'rtl' ? index - 1 : index + 1;
+                    jumpToNext(this, '{js_direction}');
+                }}
+            }});
 
-                    if (nextIndex >= 0 && nextIndex < inputs.length) {{
-                        let nextInput = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])')[nextIndex];
-                        if (nextInput) {{
-                            nextInput.focus();
-                        }}
+            // Jump on Enter key (to skip optional Merkzahl)
+            input.addEventListener('keydown', function(e) {{
+                if (e.key === 'Enter') {{
+                    // Only prevent default if we actually have somewhere to jump to (not the very last field)
+                    // If it's the last result field, let it submit
+                    if (!this.getAttribute('aria-label').startsWith('res_0')) {{
+                       e.preventDefault();
+                       jumpToNext(this, '{js_direction}');
                     }}
                 }}
             }});
@@ -251,6 +317,7 @@ def render_math_sprint():
 def check_answer():
     current_task = st.session_state.math_tasks[0]
     ans_digits = len(str(current_task['correct']))
+    game_id = st.session_state.math_game_id
 
     ans_str_correct = str(current_task['correct'])
 
@@ -261,7 +328,7 @@ def check_answer():
     wrong_indices = []
 
     for i in range(ans_digits):
-        val = st.session_state.get(f"result_{i}", "")
+        val = st.session_state.get(f"result_{i}_{game_id}", "")
         # Remove non-digits just in case
         import re
         val = re.sub(r'[^\d]', '', val)
