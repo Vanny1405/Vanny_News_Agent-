@@ -31,6 +31,8 @@ def init_math_state():
         st.session_state.math_current_task_type = 'mul'
     if 'math_best_es' not in st.session_state:
         st.session_state.math_best_es = 0
+    if 'math_game_id' not in st.session_state:
+        st.session_state.math_game_id = 0
 
 difficulty_settings = {
     'easy': {'label': 'Leicht', 'desc': '3-stellig × 1-stellig | Div: 3-stellig ÷ 1-stellig', 'range1': [100, 999], 'range2': [2, 9]},
@@ -81,8 +83,11 @@ def generate_math_task():
 
     st.session_state.math_grid_values = {}
 
-    # We must explicitly clear Streamlit session state keys associated with the grid inputs
-    # otherwise they persist across task generation
+    # Increment game_id to force Streamlit to completely re-render inputs
+    # and not carry over old text input values
+    st.session_state.math_game_id += 1
+
+    # We also keep the explicit cleanup to avoid accumulating orphaned keys
     keys_to_clear = [k for k in st.session_state.keys() if k.startswith('merk_') or k.startswith('step') or k.startswith('result_') or k == 'math_result_input']
     for k in keys_to_clear:
         del st.session_state[k]
