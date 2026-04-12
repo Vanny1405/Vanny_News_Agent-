@@ -75,10 +75,12 @@ def render_math_grid():
         }
         /* Merkzahlen styling */
         input[aria-label^="merk_"] {
-            transform: scale(0.6);
-            transform-origin: bottom center;
-            height: 2rem !important;
-            margin-bottom: -10px;
+            width: 50% !important;
+            height: 1.5rem !important;
+            font-size: 0.8rem !important;
+            margin: 0 auto !important;
+            border: 1px solid #e2e8f0 !important;
+            background-color: #f8fafc !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -184,20 +186,23 @@ def render_math_grid():
         let targetLabel = "";
 
         if (direction === 'rtl') {{
-            // Multiplication: step_X_Y -> merk_X_Y -> step_X_(Y-1)
+            // Multiplication RTL Focus Flow:
+            // Hauptfeld (H) -> Merkzahl (M) darüber & EINE SPALTE LINKS -> Hauptfeld (H) links
+            // step_X_Y -> merk_X_(Y-1) -> step_X_(Y-1)
             if (label.startsWith("step_")) {{
                 let parts = label.split("_");
                 // parts = ["step", step_idx, col_idx, game_id]
-                targetLabel = `merk_${{parts[1]}}_${{parts[2]}}_${{parts[3]}}`;
+                let targetCol = parseInt(parts[2]) - 1;
+                targetLabel = `merk_${{parts[1]}}_${{targetCol}}_${{parts[3]}}`;
             }} else if (label.startsWith("merk_add_")) {{
-                // Skip to left merk_add_
+                // Fallback for additions if used
                 let parts = label.split("_");
-                // ["merk", "add", col_idx, game_id]
                 targetLabel = `merk_add_${{parseInt(parts[2]) - 1}}_${{parts[3]}}`;
             }} else if (label.startsWith("merk_")) {{
                 let parts = label.split("_");
                 // parts = ["merk", step_idx, col_idx, game_id]
-                targetLabel = `step_${{parts[1]}}_${{parseInt(parts[2]) - 1}}_${{parts[3]}}`;
+                // From Merkzahl (Y-1), we jump down to Step (Y-1)
+                targetLabel = `step_${{parts[1]}}_${{parts[2]}}_${{parts[3]}}`;
             }} else if (label.startsWith("res_")) {{
                 let parts = label.split("_");
                 targetLabel = `res_${{parseInt(parts[1]) - 1}}_${{parts[2]}}`;

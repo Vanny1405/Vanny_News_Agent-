@@ -21,20 +21,22 @@ def verify():
         time.sleep(3)
 
         # Focus first result input via DOM manipulation instead of tab if tab is flaky
-        # We fill the bottom result boxes. Wait, the layout changed!
-        # Now there are Merkzahlen, intermediate steps, and the result row.
-        # Let's fill ONLY the result inputs to check if the empty check works.
-        inputs = page.locator('input[aria-label^="res_"]').all()
+        # Let's fill ONLY the result inputs to visually verify the smaller Merkzahlen.
+        # But wait, let's type into the rightmost main field to test the focus jump!
 
-        for i, inp in enumerate(inputs):
-            inp.fill(str(i+1))
-            time.sleep(0.2)
+        # Focus on the rightmost step field (step_0_last)
+        step_inputs = page.locator('input[aria-label^="step_0_"]').all()
+        if step_inputs:
+            # Type '3' in the last input
+            step_inputs[-1].focus()
+            step_inputs[-1].type('3', delay=100)
+            time.sleep(1)
 
-        # Submit form with Enter key
-        page.keyboard.press("Enter")
-        time.sleep(3)
+            # The focus should now be on the merk_0_(last-1) field.
+            # We can take a screenshot to verify where the focus ring is!
+            page.screenshot(path="math_expert_wrong.png")
 
-        page.screenshot(path="math_expert_wrong.png")
+        print("Test finished.")
 
         print("Test finished.")
         browser.close()
