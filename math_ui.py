@@ -85,25 +85,32 @@ def render_math_grid():
         if task_type == 'mul':
             max_cols = max(len(n1_str) + len(n2_str) + 1, len(ans_str) + 1)
 
-            # Merkzahlen
-            st.markdown("<p style='font-size: 10px; color: #a0aec0; margin:0;'>Merkzahlen (Überträge):</p>", unsafe_allow_html=True)
-            cols_merk = st.columns(max_cols)
-            for i in range(max_cols):
-                with cols_merk[i]:
-                    st.text_input(f"merk_{i}", key=f"merk_{i}", max_chars=1, label_visibility="collapsed")
-
             st.markdown(f"<div class='task-text'>{n1_str} × {n2_str}</div>", unsafe_allow_html=True)
             st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
 
-            # Intermediate rows
+            # Intermediate rows (each preceded by its own smart carries / Merkzahlen row)
             num_steps = len(n2_str)
             for step in range(num_steps):
+                # Smart carries for this intermediate step
+                st.markdown("<p style='font-size: 8px; color: #cbd5e1; margin: 0 0 -5px 0; text-align: right;'>Merkzahlen</p>", unsafe_allow_html=True)
+                cols_merk = st.columns(max_cols)
+                for i in range(max_cols):
+                    with cols_merk[i]:
+                        st.text_input(f"merk_{step}_{i}", key=f"merk_{step}_{i}", max_chars=1, label_visibility="collapsed", help="Merkzahl")
+
+                # The actual intermediate calculation step
                 cols_step = st.columns(max_cols)
                 for i in range(max_cols):
                     with cols_step[i]:
                         st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
 
             if num_steps > 1:
+                # Add a final carry row for the addition phase before the result
+                st.markdown("<p style='font-size: 8px; color: #cbd5e1; margin: 0 0 -5px 0; text-align: right;'>Additions-Überträge</p>", unsafe_allow_html=True)
+                cols_add_merk = st.columns(max_cols)
+                for i in range(max_cols):
+                    with cols_add_merk[i]:
+                        st.text_input(f"merk_add_{i}", key=f"merk_add_{i}", max_chars=1, label_visibility="collapsed", help="Übertrag für Addition")
                 st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
 
             # Result row
@@ -134,13 +141,22 @@ def render_math_grid():
             st.markdown("<div style='width: 100%; max-width: " + str(max_cols * 4) + "rem; align-self: flex-start; margin-top: 10px;'>", unsafe_allow_html=True)
 
             for step in range(num_steps):
-                cols_step = st.columns(max_cols)
+                # The staircase involves subtracting every 2nd step
+                # Let's add an extra tiny column for the minus sign for odd steps (subtraction steps)
+                cols_step = st.columns([0.5] + [1] * max_cols)
+
+                with cols_step[0]:
+                    if step % 2 == 1:
+                        st.markdown("<div style='font-family: monospace; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; height: 3rem;'>-</div>", unsafe_allow_html=True)
+                    else:
+                        st.empty()
+
                 for i in range(max_cols):
-                    with cols_step[i]:
+                    with cols_step[i+1]:
                         st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
                 # Add line after subtractions
                 if step % 2 == 1 and step < num_steps - 1:
-                    st.markdown("<div class='hr-line' style='width: 50%; margin-left: 0;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div class='hr-line' style='width: 60%; margin-left: 0;'></div>", unsafe_allow_html=True)
 
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -356,7 +372,7 @@ def render_math_results():
         msg = "VP of Algebra: Leading with logic. Your calculation speed is a competitive advantage."
     elif es < 700:
         msg = "CFO: Financial integrity confirmed. You own the numbers."
-    elif es < 1000:
+    elif es <= 1000 or (es > 1000 and accuracy_pct < 100):
         msg = "Math CEO: Market disruption through mathematical precision. Excellent execution."
     else:
         msg = "Emeritus Professor: Absolute Mastery. The numbers don't just speak to you – they obey."
