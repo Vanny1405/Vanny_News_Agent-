@@ -33,10 +33,9 @@ def init_math_state():
         st.session_state.math_best_es = 0
 
 difficulty_settings = {
-    'easy': {'label': 'Leicht', 'desc': '3-stellig × 1-stellig | Div: 3-stellig ÷ 1-stellig', 'range1': [100, 500], 'range2': [2, 5]},
-    'medium': {'label': 'Mittel', 'desc': '3-stellig × 2-stellig | Div: 4-stellig ÷ 1-stellig', 'range1': [200, 999], 'range2': [11, 99]},
-    'hard': {'label': 'Meister', 'desc': '4-stellig × 2-stellig | Div: 5-stellig ÷ 2-stellig', 'range1': [1000, 9999], 'range2': [11, 99]},
-    'expert': {'label': 'Executive', 'desc': '5-stellig × 2-stellig | Div: 5-stellig ÷ 3-stellig', 'range1': [10000, 99999], 'range2': [11, 99]}
+    'easy': {'label': 'Leicht', 'desc': '3-stellig × 1-stellig | Div: 3-stellig ÷ 1-stellig', 'range1': [100, 999], 'range2': [2, 9]},
+    'medium': {'label': 'Mittel', 'desc': '4-stellig × 2-stellig | Div: 5-stellig ÷ 1-stellig', 'range1': [1000, 9999], 'range2': [11, 99]},
+    'hard': {'label': 'CEO (Meister)', 'desc': '5-stellig × 2-stellig | Div: 5-stellig ÷ 2-stellig', 'range1': [10000, 99999], 'range2': [11, 99]}
 }
 
 def generate_math_task():
@@ -61,19 +60,21 @@ def generate_math_task():
         # Division logic setup based on difficulty mapping
         if st.session_state.math_difficulty == 'easy':
             n2 = random.randint(2, 9)
-            correct = random.randint(100, 333)
-            n1 = n2 * correct
+            # n1 up to 3 digits (max 999), meaning correct is up to 999/2
+            n1 = random.randint(100, 999)
+            correct = n1 // n2
+            n1 = n2 * correct # Ensure exact division
         elif st.session_state.math_difficulty == 'medium':
+            # Div: 5-stellig ÷ 1-stellig
             n2 = random.randint(2, 9)
-            correct = random.randint(334, 1111)
+            n1 = random.randint(10000, 99999)
+            correct = n1 // n2
             n1 = n2 * correct
-        elif st.session_state.math_difficulty == 'hard':
+        else: # hard / CEO
+            # Div: 5-stellig ÷ 2-stellig
             n2 = random.randint(11, 99)
-            correct = random.randint(100, 999)
-            n1 = n2 * correct
-        else: # expert
-            n2 = random.randint(100, 999)
-            correct = random.randint(100, 999)
+            n1 = random.randint(10000, 99999)
+            correct = n1 // n2
             n1 = n2 * correct
 
         st.session_state.math_tasks = [{'n1': n1, 'n2': n2, 'correct': correct, 'type': 'div'}]
