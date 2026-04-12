@@ -6,10 +6,18 @@ import streamlit.components.v1 as components
 def render_math_setup():
     st.markdown("<div style='text-align: center; margin-bottom: 20px;'><h1 style='color: #4f46e5;'>🧠 Executive Math Sprint</h1><p>Professional Brain Training</p></div>", unsafe_allow_html=True)
 
+    if st.session_state.math_best_es > 0:
+        st.markdown(f"<p style='text-align: center; font-weight: bold; color: #166534;'>🏆 Historischer Best-Score (ES): {int(st.session_state.math_best_es)}</p>", unsafe_allow_html=True)
+
     st.info("Rechne die Aufgaben wie in deinem Heft. Trage jede Ziffer in ein eigenes Kästchen ein. Das System fokussiert automatisch das nächste Feld.")
 
-    diff = st.radio("Wähle dein Level:", options=list(difficulty_settings.keys()), format_func=lambda x: difficulty_settings[x]['label'])
-    st.session_state.math_difficulty = diff
+    col1, col2 = st.columns(2)
+    with col1:
+        diff = st.radio("Wähle dein Level:", options=list(difficulty_settings.keys()), format_func=lambda x: f"{difficulty_settings[x]['label']} ({difficulty_settings[x]['desc']})")
+        st.session_state.math_difficulty = diff
+    with col2:
+        op = st.radio("Operationsmodus:", options=['Gemischt', 'Multiplikation', 'Division'])
+        st.session_state.math_operation_mode = op
 
     if st.button("🚀 SPRINT 1 STARTEN (8 Min)", use_container_width=True):
         start_sprint()
@@ -17,7 +25,7 @@ def render_math_setup():
 
 def render_math_grid():
     current_task = st.session_state.math_tasks[0]
-    digits = difficulty_settings[st.session_state.math_difficulty]['digits']
+    ans_digits = len(str(current_task['correct']))
     task_type = current_task['type']
 
     # CSS for the grid inputs
@@ -47,53 +55,66 @@ def render_math_grid():
             background-color: #fee2e2 !important;
             border-color: #ef4444 !important;
         }
+        .task-header {
+            background-color: #1f2937;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .task-header h2 {
+            text-align: center;
+            color: white;
+            font-family: 'Roboto Mono', monospace;
+            letter-spacing: 0.1em;
+            font-size: 2.5rem;
+            margin: 0;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     with st.container():
         st.markdown("<div class='math-container'>", unsafe_allow_html=True)
 
-        # Display Task
+        # Display Task (Dark Header)
         operator_sym = '×' if task_type == 'mul' else '÷'
-        st.markdown(f"<h2 style='text-align: center; font-family: \"Roboto Mono\", monospace; letter-spacing: 0.2em; font-size: 2.5rem; margin-bottom: 30px;'>{current_task['n1']} <span style='color: #4f46e5;'>{operator_sym}</span> {current_task['n2']}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<div class='task-header'><h2>{current_task['n1']} <span style='color: #a78bfa;'>{operator_sym}</span> {current_task['n2']}</h2></div>", unsafe_allow_html=True)
 
-        cols = st.columns(digits)
+        cols = st.columns(ans_digits)
 
         # Store layout direction for JS
         js_direction = 'rtl' if task_type == 'mul' else 'ltr'
 
         if task_type == 'mul':
             # Carry row
-            for i in range(digits):
+            for i in range(ans_digits):
                 with cols[i]:
                     st.text_input("", key=f"carry_{i}", max_chars=1, label_visibility="collapsed", args=("carry-input math-cell",))
 
-            # Intermediate rows for Hard mode (3x2)
-            if st.session_state.math_difficulty == 'hard':
-                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                cols_step1 = st.columns(digits)
-                for i in range(digits):
-                    with cols_step1[i]:
-                        st.text_input("", key=f"step1_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell",))
+            # Intermediate rows (1 row per calculation step based on n2 length)
+            n2_str = str(current_task['n2'])
+            num_steps = len(n2_str)
 
-                cols_step2 = st.columns(digits)
-                for i in range(digits):
-                    with cols_step2[i]:
-                        st.text_input("", key=f"step2_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell",))
+            if num_steps > 1:
+                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                for step in range(num_steps):
+                    cols_step = st.columns(ans_digits)
+                    for i in range(ans_digits):
+                        with cols_step[i]:
+                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell",))
 
             st.markdown("<hr style='border-top: 2px solid #2d3748; margin: 15px 0;'>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis:</p>", unsafe_allow_html=True)
 
-            cols_result = st.columns(digits)
-            for i in range(digits):
+            cols_result = st.columns(ans_digits)
+            for i in range(ans_digits):
                 with cols_result[i]:
                     val = st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell result-cell",))
                     st.session_state.math_grid_values[f"result_{i}"] = val
 
         else: # Division
             st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis (Links nach Rechts):</p>", unsafe_allow_html=True)
-            cols_result = st.columns(digits)
-            for i in range(digits):
+            cols_result = st.columns(ans_digits)
+            for i in range(ans_digits):
                 with cols_result[i]:
                     val = st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell result-cell",))
                     st.session_state.math_grid_values[f"result_{i}"] = val
@@ -156,18 +177,48 @@ def render_math_sprint():
 
     render_math_grid()
 
-    if st.button("PRÜFEN ➔", use_container_width=True, type="primary"):
-        check_answer()
+    st.markdown("""
+    <style>
+    .stButton > button {
+        background-color: #7c3aed !important;
+        color: white !important;
+        border: none !important;
+        font-weight: bold !important;
+        padding: 0.75rem 1rem !important;
+        border-radius: 0.5rem !important;
+    }
+    .stButton > button:hover {
+        background-color: #6d28d9 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Store check state in session to render skip button without nested execution block issues
+    if 'math_last_check_failed' not in st.session_state:
+        st.session_state.math_last_check_failed = False
+
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        if st.button("PRÜFEN ➔", use_container_width=True):
+            check_answer()
+
+    with col2:
+        if st.session_state.math_last_check_failed:
+            if st.button("Überspringen", use_container_width=True):
+                st.session_state.math_last_check_failed = False
+                generate_math_task()
+                st.rerun()
 
     st.markdown("<p style='text-align: center; font-size: 10px; color: #a0aec0; margin-top: 10px;'>Tipp: Leerlassen oder Falsche Eingaben werden rot markiert.</p>", unsafe_allow_html=True)
 
 
 def check_answer():
     current_task = st.session_state.math_tasks[0]
-    digits = difficulty_settings[st.session_state.math_difficulty]['digits']
+    ans_digits = len(str(current_task['correct']))
 
     answer_str = ""
-    for i in range(digits):
+    for i in range(ans_digits):
         val = st.session_state.get(f"result_{i}", "")
         if not val:
             val = st.session_state.math_grid_values.get(f"result_{i}", "")
@@ -186,28 +237,26 @@ def check_answer():
     if user_ans == current_task['correct']:
         st.session_state.math_total_score += len(str(current_task['correct']))
         st.session_state.math_correct_digits_count += len(str(current_task['correct']))
+        st.session_state.math_last_check_failed = False
         st.toast("Korrekt! Nächste Aufgabe...", icon="✅")
         time.sleep(0.5) # Short pause for feedback
         generate_math_task()
         st.rerun()
     else:
         st.error(f"Falsch! Das korrekte Ergebnis wäre: {current_task['correct']}")
+        st.session_state.math_last_check_failed = True
 
-        # Inject JS to visually mark input fields as wrong
+        # Inject JS to visually mark ONLY the result inputs as wrong
         error_js = """
         <script>
-            const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
-            inputs.forEach(input => {
+            const result_inputs = window.parent.document.querySelectorAll('.result-cell input');
+            result_inputs.forEach(input => {
                 input.style.backgroundColor = '#fee2e2';
                 input.style.borderColor = '#ef4444';
             });
         </script>
         """
         components.html(error_js, height=0)
-
-        if st.button("Überspringen"):
-            generate_math_task()
-            st.rerun()
 
 def render_math_break():
     st.markdown("<div class='math-container' style='text-align: center; padding: 40px;'>", unsafe_allow_html=True)
@@ -236,6 +285,11 @@ def render_math_results():
     accuracy_pct = acc_ratio * 100
 
     es = st.session_state.math_total_score * (acc_ratio ** 3)
+
+    if es > st.session_state.math_best_es:
+        st.session_state.math_best_es = es
+        st.balloons()
+        st.markdown(f"<h3 style='color: #ea580c;'>🎉 Neuer Rekord! 🎉</h3>", unsafe_allow_html=True)
 
     st.markdown(f"<h1 style='color: #4f46e5; font-size: 4rem; margin: 20px 0;'>ES: {int(es)}</h1>", unsafe_allow_html=True)
     st.markdown(f"<p>Genauigkeit: {accuracy_pct:.1f}%</p>", unsafe_allow_html=True)
