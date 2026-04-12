@@ -82,7 +82,7 @@ def generate_math_task():
 
     # We must explicitly clear Streamlit session state keys associated with the grid inputs
     # otherwise they persist across task generation
-    keys_to_clear = [k for k in st.session_state.keys() if k.startswith('carry_') or k.startswith('step') or k.startswith('result_')]
+    keys_to_clear = [k for k in st.session_state.keys() if k.startswith('carry_') or k.startswith('step') or k.startswith('result_') or k == 'math_result_input']
     for k in keys_to_clear:
         del st.session_state[k]
 
