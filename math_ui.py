@@ -38,11 +38,6 @@ def render_math_grid():
             padding: 0 !important;
             height: 3rem !important;
         }
-        .carry-input input {
-            font-size: 0.8rem !important;
-            height: 1.5rem !important;
-            color: #718096 !important;
-        }
         .math-container {
             background: white;
             border-radius: 15px;
@@ -79,45 +74,52 @@ def render_math_grid():
         operator_sym = '×' if task_type == 'mul' else '÷'
         st.markdown(f"<div class='task-header'><h2>{current_task['n1']} <span style='color: #a78bfa;'>{operator_sym}</span> {current_task['n2']}</h2></div>", unsafe_allow_html=True)
 
-        cols = st.columns(ans_digits)
-
         # Store layout direction for JS
         js_direction = 'rtl' if task_type == 'mul' else 'ltr'
 
+        # Determine number of columns based on maximum needed width
+        num_cols = ans_digits
         if task_type == 'mul':
-            # Carry row
-            for i in range(ans_digits):
-                with cols[i]:
-                    st.text_input("", key=f"carry_{i}", max_chars=1, label_visibility="collapsed", args=("carry-input math-cell",))
-
             # Intermediate rows (1 row per calculation step based on n2 length)
             n2_str = str(current_task['n2'])
             num_steps = len(n2_str)
 
             if num_steps > 1:
-                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Zwischenschritte:</p>", unsafe_allow_html=True)
                 for step in range(num_steps):
-                    cols_step = st.columns(ans_digits)
-                    for i in range(ans_digits):
+                    cols_step = st.columns(num_cols)
+                    for i in range(num_cols):
                         with cols_step[i]:
-                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell",))
+                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
 
             st.markdown("<hr style='border-top: 2px solid #2d3748; margin: 15px 0;'>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis:</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis (Rechts nach Links):</p>", unsafe_allow_html=True)
 
-            cols_result = st.columns(ans_digits)
-            for i in range(ans_digits):
+            cols_result = st.columns(num_cols)
+            for i in range(num_cols):
                 with cols_result[i]:
-                    val = st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell result-cell",))
-                    st.session_state.math_grid_values[f"result_{i}"] = val
+                    st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("result-cell",))
 
         else: # Division
             st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis (Links nach Rechts):</p>", unsafe_allow_html=True)
-            cols_result = st.columns(ans_digits)
-            for i in range(ans_digits):
+            cols_result = st.columns(num_cols)
+            for i in range(num_cols):
                 with cols_result[i]:
-                    val = st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("math-cell result-cell",))
-                    st.session_state.math_grid_values[f"result_{i}"] = val
+                    st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("result-cell",))
+
+            # Provide scratchpad rows
+            n1_len = len(str(current_task['n1']))
+            n2_len = len(str(current_task['n2']))
+            num_steps = max(1, n1_len - n2_len + 1)
+
+            if num_steps > 1:
+                st.markdown("<hr style='border-top: 2px solid #2d3748; margin: 15px 0;'>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Rechenweg:</p>", unsafe_allow_html=True)
+                for step in range(num_steps):
+                    cols_step = st.columns(num_cols)
+                    for i in range(num_cols):
+                        with cols_step[i]:
+                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -125,12 +127,6 @@ def render_math_grid():
     js_code = f"""
     <script>
     const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
-
-    // Sort inputs based on direction to map logical flow
-    let sortedInputs = Array.from(inputs);
-
-    // Simplistic approach for now: just add event listeners to all text inputs
-    // We rely on the user tabbing or the script finding the next logical input
 
     inputs.forEach((input, index) => {{
         // Remove old listeners to prevent duplicates on rerun
@@ -141,13 +137,7 @@ def render_math_grid():
             if (this.value.length >= 1) {{
                 let nextIndex = '{js_direction}' === 'rtl' ? index - 1 : index + 1;
 
-                // For RTL (multiplication), the result row visually is left-to-right in the DOM
-                // but conceptually we fill it right-to-left.
-                // A better approach is to rely on data-attributes, but since we can't easily set them
-                // on Streamlit inputs, we do a basic DOM traversal
-
                 if (nextIndex >= 0 && nextIndex < inputs.length) {{
-                    // Try to find next input in parent document
                     let nextInput = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])')[nextIndex];
                     if (nextInput) {{
                         nextInput.focus();
@@ -175,55 +165,71 @@ def render_math_sprint():
             st.session_state.math_game_state = 'results'
         st.rerun()
 
-    render_math_grid()
-
-    st.markdown("""
-    <style>
-    .stButton > button {
-        background-color: #7c3aed !important;
-        color: white !important;
-        border: none !important;
-        font-weight: bold !important;
-        padding: 0.75rem 1rem !important;
-        border-radius: 0.5rem !important;
-    }
-    .stButton > button:hover {
-        background-color: #6d28d9 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     # Store check state in session to render skip button without nested execution block issues
     if 'math_last_check_failed' not in st.session_state:
         st.session_state.math_last_check_failed = False
 
-    col1, col2 = st.columns([3, 1])
+    # Use a form so Enter submits
+    with st.form(key="math_form", clear_on_submit=False):
+        render_math_grid()
 
-    with col1:
-        if st.button("PRÜFEN ➔", use_container_width=True):
-            check_answer()
+        st.markdown("""
+        <style>
+        .stButton > button {
+            background-color: #7c3aed !important;
+            color: white !important;
+            border: none !important;
+            font-weight: bold !important;
+            padding: 0.75rem 1rem !important;
+            border-radius: 0.5rem !important;
+        }
+        .stButton > button:hover {
+            background-color: #6d28d9 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-    with col2:
-        if st.session_state.math_last_check_failed:
-            if st.button("Überspringen", use_container_width=True):
-                st.session_state.math_last_check_failed = False
-                generate_math_task()
-                st.rerun()
+        col1, col2 = st.columns([3, 1])
 
-    st.markdown("<p style='text-align: center; font-size: 10px; color: #a0aec0; margin-top: 10px;'>Tipp: Leerlassen oder Falsche Eingaben werden rot markiert.</p>", unsafe_allow_html=True)
+        with col1:
+            submit_btn = st.form_submit_button("PRÜFEN ➔", use_container_width=True)
+
+        with col2:
+            if st.session_state.math_last_check_failed:
+                skip_btn = st.form_submit_button("Überspringen", use_container_width=True)
+            else:
+                skip_btn = False
+
+        st.markdown("<p style='text-align: center; font-size: 10px; color: #a0aec0; margin-top: 10px;'>Tipp: Leerlassen oder Falsche Eingaben werden rot markiert.</p>", unsafe_allow_html=True)
+
+    if submit_btn:
+        check_answer()
+    if skip_btn:
+        st.session_state.math_last_check_failed = False
+        generate_math_task()
+        st.rerun()
 
 
 def check_answer():
     current_task = st.session_state.math_tasks[0]
     ans_digits = len(str(current_task['correct']))
 
-    answer_str = ""
+    # Build answer string from individual input fields
+    # Make sure we don't accidentally pull empty strings out and concatenate
+    answer_parts = []
+    has_empty = False
+
     for i in range(ans_digits):
         val = st.session_state.get(f"result_{i}", "")
-        if not val:
-            val = st.session_state.math_grid_values.get(f"result_{i}", "")
-        if val and val.isdigit():
-            answer_str += val
+        # Remove non-digits just in case
+        import re
+        val = re.sub(r'[^\d]', '', val)
+        if val:
+            answer_parts.append(val)
+        else:
+            has_empty = True
+
+    answer_str = "".join(answer_parts)
 
     if not answer_str:
         st.toast("Bitte trage ein Ergebnis ein!", icon="⚠️")
@@ -246,13 +252,14 @@ def check_answer():
         st.error(f"Falsch! Das korrekte Ergebnis wäre: {current_task['correct']}")
         st.session_state.math_last_check_failed = True
 
-        # Inject JS to visually mark ONLY the result inputs as wrong
+        # Inject JS to visually mark input fields as wrong
         error_js = """
         <script>
-            const result_inputs = window.parent.document.querySelectorAll('.result-cell input');
-            result_inputs.forEach(input => {
+            const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
+            inputs.forEach(input => {
                 input.style.backgroundColor = '#fee2e2';
                 input.style.borderColor = '#ef4444';
+                input.style.color = '#991b1b';
             });
         </script>
         """
