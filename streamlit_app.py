@@ -155,11 +155,12 @@ def fetch_aggregated_rss_data(feeds, limit_per_feed=3):
 
     return aggregated_entries
 
+# Verfügbare Text Modelle
 VERFUEGBARE_MODELLE = [
-    'gemini-3.1-flash-lite-preview',  # 500 Anfragen/Tag - Dein Haupt-Modell
-    'gemini-2.5-flash-lite',         # 20 Anfragen/Tag - Stabilster Fallback
-    'gemini-3-flash-preview',        # 20 Anfragen/Tag - Falls 3.1 mal hakt
-    'gemini-2.5-flash'               # Letzte Reserve
+    'gemini-3.1-flash-lite', # Default laut Auftrag
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash'
 ]
 
 # State für Detail-Ansicht
@@ -168,55 +169,65 @@ if 'active_cluster' not in st.session_state:
 if 'last_analysis_result' not in st.session_state:
     st.session_state.last_analysis_result = None
 
-# 4. SIDEBAR (KONFIGURATION)
+# 4. SIDEBAR (NAVIGATION & KONFIGURATION)
 with st.sidebar:
-    st.title("⚙️ Einstellungen")
-    st.info("Wähle deine Modelle für die KI-Zusammenfassung.")
-
-    primaeres_modell = st.selectbox(
-        "Primäres Modell:",
-        VERFUEGBARE_MODELLE,
-        index=0,
-        help="Wird zuerst versucht."
-    )
-
-    fallback_modell = st.selectbox(
-        "Fallback Modell (bei Limit-Fehler):",
-        VERFUEGBARE_MODELLE,
-        index=1,
-        help="Wird genutzt, wenn das primäre Modell keine Quote mehr hat."
-    )
+    st.title("🧭 Navigation")
+    app_mode = st.radio("Wähle ein Modul:", ["📰 News-Monitor", "🧠 Brain Training"])
 
     st.divider()
-
-    eigenes_thema = st.text_area(
-        "Eigenes Thema überwachen:",
-        help="Gib ein Thema ein, um es zu analysieren. (z.B. Bitcoin, Tesla...)"
-    )
-    if st.button("Thema analysieren"):
-        if eigenes_thema:
-            st.session_state.active_cluster = f"Eigene Suche: {eigenes_thema}"
-            st.session_state.last_analysis_result = None # Force re-fetch for new topic
-
-    st.divider()
-    st.caption("Status: Verbunden mit Gemini API")
     
-    # Diagnose-Option (falls du mal die Modell-Liste brauchst)
-    with st.expander("System-Diagnose"):
-        if st.button("Verfügbare Modelle auflisten"):
-            models = [m.name for m in genai.list_models()]
-            st.code(models)
+    if app_mode == "📰 News-Monitor":
+        st.title("⚙️ Einstellungen")
+        st.info("Wähle deine Modelle für die KI-Zusammenfassung.")
+
+        primaeres_modell = st.selectbox(
+            "Primäres Modell:",
+            VERFUEGBARE_MODELLE,
+            index=0,
+            help="Wird zuerst versucht."
+        )
+
+        fallback_modell = st.selectbox(
+            "Fallback Modell (bei Limit-Fehler):",
+            VERFUEGBARE_MODELLE,
+            index=1,
+            help="Wird genutzt, wenn das primäre Modell keine Quote mehr hat."
+        )
+
+        st.divider()
+
+        eigenes_thema = st.text_area(
+            "Eigenes Thema überwachen:",
+            help="Gib ein Thema ein, um es zu analysieren. (z.B. Bitcoin, Tesla...)"
+        )
+        if st.button("Thema analysieren"):
+            if eigenes_thema:
+                st.session_state.active_cluster = f"Eigene Suche: {eigenes_thema}"
+                st.session_state.last_analysis_result = None # Force re-fetch for new topic
+
+        st.divider()
+        st.caption("Status: Verbunden mit Gemini API")
+
+        # Diagnose-Option (falls du mal die Modell-Liste brauchst)
+        with st.expander("System-Diagnose"):
+            if st.button("Verfügbare Modelle auflisten"):
+                models = [m.name for m in genai.list_models()]
+                st.code(models)
+    else:
+        primaeres_modell = VERFUEGBARE_MODELLE[0]
+        fallback_modell = VERFUEGBARE_MODELLE[1]
 
 # 5. HAUPTBEREICH & GRID DASHBOARD
-st.markdown(f"""
+if app_mode == "📰 News-Monitor":
+    st.markdown(f"""
     <div class="dashboard-header">
         <h1 class="dashboard-title">📈 Executive News Monitor</h1>
         <div class="live-time">Status: LIVE • {datetime.now().strftime('%H:%M')} Uhr</div>
     </div>
 """, unsafe_allow_html=True)
 
-# Grid Layout: 2 Spalten
-col1, col2 = st.columns(2)
+    # Grid Layout: 2 Spalten
+    col1, col2 = st.columns(2)
 
 @st.cache_data(ttl=900)
 def generate_cluster_summary(cluster_name, rss_data, model_name):
@@ -286,40 +297,45 @@ def render_bento_card(cluster_name, cluster_data, col, primary_model, fallback_m
                 st.session_state.active_cluster = cluster_name
                 st.session_state.last_analysis_result = None
 
-# Rendern der 4 Cluster-Karten
-clusters_list = list(NEWS_CLUSTERS.items())
-with st.spinner('Führe KI-Analyse für das Dashboard aus (Modelle übersetzen & aggregieren RSS-Feeds)...'):
-    render_bento_card(clusters_list[0][0], clusters_list[0][1], col1, primaeres_modell, fallback_modell)
-    render_bento_card(clusters_list[1][0], clusters_list[1][1], col2, primaeres_modell, fallback_modell)
-    render_bento_card(clusters_list[2][0], clusters_list[2][1], col1, primaeres_modell, fallback_modell)
-    render_bento_card(clusters_list[3][0], clusters_list[3][1], col2, primaeres_modell, fallback_modell)
+if app_mode == "📰 News-Monitor":
+    # Rendern der 4 Cluster-Karten
+    clusters_list = list(NEWS_CLUSTERS.items())
+    with st.spinner('Führe KI-Analyse für das Dashboard aus (Modelle übersetzen & aggregieren RSS-Feeds)...'):
+        render_bento_card(clusters_list[0][0], clusters_list[0][1], col1, primaeres_modell, fallback_modell)
+        render_bento_card(clusters_list[1][0], clusters_list[1][1], col2, primaeres_modell, fallback_modell)
+        render_bento_card(clusters_list[2][0], clusters_list[2][1], col1, primaeres_modell, fallback_modell)
+        render_bento_card(clusters_list[3][0], clusters_list[3][1], col2, primaeres_modell, fallback_modell)
 
-st.divider()
+    st.divider()
 
-# Platzhalter für die Detail-Ansicht oder den alten Button
-st.subheader("📰 Deep Dive & Original-Quellen")
-if not st.session_state.active_cluster:
-    st.info("Klicke auf 'Details' in einem der Cluster oben, um die Original-Schlagzeilen und Quell-Links einzusehen.")
+    # Platzhalter für die Detail-Ansicht oder den alten Button
+    st.subheader("📰 Deep Dive & Original-Quellen")
+    if not st.session_state.active_cluster:
+        st.info("Klicke auf 'Details' in einem der Cluster oben, um die Original-Schlagzeilen und Quell-Links einzusehen.")
 
-if st.session_state.active_cluster:
-    active_topic = st.session_state.active_cluster
-    st.markdown(f"#### Rohdaten für: **{active_topic}**")
+    if st.session_state.active_cluster:
+        active_topic = st.session_state.active_cluster
+        st.markdown(f"#### Rohdaten für: **{active_topic}**")
 
-    if "Eigene Suche" in active_topic:
-         st.warning("Die Detailansicht für die Eigene Suche ist noch in Entwicklung. Bitte wähle ein vorgefertigtes Cluster für Deep Dives.")
-    else:
-        # Finde das ausgewählte Cluster
-        selected_cluster_data = NEWS_CLUSTERS.get(active_topic)
-        if selected_cluster_data:
-            # Hole die (bereits gecacheten) RSS Daten nochmal
-            rss_data = fetch_aggregated_rss_data(selected_cluster_data["feeds"], limit_per_feed=5)
+        if "Eigene Suche" in active_topic:
+             st.warning("Die Detailansicht für die Eigene Suche ist noch in Entwicklung. Bitte wähle ein vorgefertigtes Cluster für Deep Dives.")
+        else:
+            # Finde das ausgewählte Cluster
+            selected_cluster_data = NEWS_CLUSTERS.get(active_topic)
+            if selected_cluster_data:
+                # Hole die (bereits gecacheten) RSS Daten nochmal
+                rss_data = fetch_aggregated_rss_data(selected_cluster_data["feeds"], limit_per_feed=5)
 
-            if rss_data:
-                for item in rss_data:
-                    # Clean up the output using Streamlit elements
-                    st.markdown(f"🔗 **[{item['title']}]({item['link']})**")
-            else:
-                st.info("Keine Rohdaten für dieses Cluster gefunden.")
+                if rss_data:
+                    for item in rss_data:
+                        # Clean up the output using Streamlit elements
+                        st.markdown(f"🔗 **[{item['title']}]({item['link']})**")
+                else:
+                    st.info("Keine Rohdaten für dieses Cluster gefunden.")
 
-st.divider()
-st.caption("Powered by Gemini Models & Streamlit Cloud • 2026")
+    st.divider()
+    st.caption("Powered by Gemini Models & Streamlit Cloud • 2026")
+
+elif app_mode == "🧠 Brain Training":
+    from math_ui import render_brain_training
+    render_brain_training()
