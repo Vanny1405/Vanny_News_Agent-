@@ -28,6 +28,10 @@ def render_math_grid():
     ans_digits = len(str(current_task['correct']))
     task_type = current_task['type']
 
+    n1_str = str(current_task['n1'])
+    n2_str = str(current_task['n2'])
+    ans_str = str(current_task['correct'])
+
     # CSS for the grid inputs
     st.markdown("""
         <style>
@@ -45,81 +49,100 @@ def render_math_grid():
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             margin-bottom: 20px;
             border: 2px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .wrong-input input {
-            background-color: #fee2e2 !important;
-            border-color: #ef4444 !important;
-        }
-        .task-header {
-            background-color: #1f2937;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .task-header h2 {
-            text-align: center;
-            color: white;
+        .task-text {
             font-family: 'Roboto Mono', monospace;
-            letter-spacing: 0.1em;
-            font-size: 2.5rem;
-            margin: 0;
+            font-size: 2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 3rem;
+            margin-bottom: 10px;
+        }
+        .hr-line {
+            border-top: 2px solid #2d3748;
+            margin: 5px 0;
+            width: 100%;
+        }
+        /* Make columns tight for the grid */
+        div[data-testid="column"] {
+            min-width: 3rem !important;
+            padding: 0 4px !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
+    # Store layout direction for JS
+    js_direction = 'rtl' if task_type == 'mul' else 'ltr'
+
     with st.container():
         st.markdown("<div class='math-container'>", unsafe_allow_html=True)
 
-        # Display Task (Dark Header)
-        operator_sym = '×' if task_type == 'mul' else '÷'
-        st.markdown(f"<div class='task-header'><h2>{current_task['n1']} <span style='color: #a78bfa;'>{operator_sym}</span> {current_task['n2']}</h2></div>", unsafe_allow_html=True)
-
-        # Store layout direction for JS
-        js_direction = 'rtl' if task_type == 'mul' else 'ltr'
-
-        # Determine number of columns based on maximum needed width
-        num_cols = ans_digits
         if task_type == 'mul':
-            # Intermediate rows (1 row per calculation step based on n2 length)
-            n2_str = str(current_task['n2'])
+            max_cols = max(len(n1_str) + len(n2_str) + 1, len(ans_str) + 1)
+
+            # Merkzahlen
+            st.markdown("<p style='font-size: 10px; color: #a0aec0; margin:0;'>Merkzahlen (Überträge):</p>", unsafe_allow_html=True)
+            cols_merk = st.columns(max_cols)
+            for i in range(max_cols):
+                with cols_merk[i]:
+                    st.text_input(f"merk_{i}", key=f"merk_{i}", max_chars=1, label_visibility="collapsed")
+
+            st.markdown(f"<div class='task-text'>{n1_str} × {n2_str}</div>", unsafe_allow_html=True)
+            st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
+
+            # Intermediate rows
             num_steps = len(n2_str)
+            for step in range(num_steps):
+                cols_step = st.columns(max_cols)
+                for i in range(max_cols):
+                    with cols_step[i]:
+                        st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
 
             if num_steps > 1:
-                st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Zwischenschritte:</p>", unsafe_allow_html=True)
-                for step in range(num_steps):
-                    cols_step = st.columns(num_cols)
-                    for i in range(num_cols):
-                        with cols_step[i]:
-                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
+                st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
 
-            st.markdown("<hr style='border-top: 2px solid #2d3748; margin: 15px 0;'>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis (Rechts nach Links):</p>", unsafe_allow_html=True)
-
-            cols_result = st.columns(num_cols)
-            for i in range(num_cols):
-                with cols_result[i]:
-                    st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("result-cell",))
+            # Result row
+            st.markdown("<p style='font-size: 10px; color: #a0aec0; margin:0;'>Endergebnis (Rechts nach Links eintragen):</p>", unsafe_allow_html=True)
+            cols_res = st.columns(max_cols)
+            offset = max_cols - ans_digits
+            for i in range(max_cols):
+                with cols_res[i]:
+                    if i >= offset:
+                        res_idx = i - offset
+                        st.text_input(f"res_{res_idx}", key=f"result_{res_idx}", max_chars=1, label_visibility="collapsed")
+                    else:
+                        st.empty()
 
         else: # Division
-            st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Dein Endergebnis (Links nach Rechts):</p>", unsafe_allow_html=True)
-            cols_result = st.columns(num_cols)
-            for i in range(num_cols):
-                with cols_result[i]:
-                    st.text_input("", key=f"result_{i}", max_chars=1, label_visibility="collapsed", args=("result-cell",))
+            max_cols = len(n1_str)
 
-            # Provide scratchpad rows
-            n1_len = len(str(current_task['n1']))
-            n2_len = len(str(current_task['n2']))
-            num_steps = max(1, n1_len - n2_len + 1)
+            # Top Row: Task and Result Inputs
+            top_cols = st.columns([max_cols + 2] + [1]*ans_digits)
+            with top_cols[0]:
+                st.markdown(f"<div class='task-text' style='justify-content: flex-start;'>{n1_str} ÷ {n2_str} =</div>", unsafe_allow_html=True)
+            for i in range(ans_digits):
+                with top_cols[i+1]:
+                    st.text_input(f"res_{i}", key=f"result_{i}", max_chars=1, label_visibility="collapsed")
 
-            if num_steps > 1:
-                st.markdown("<hr style='border-top: 2px solid #2d3748; margin: 15px 0;'>", unsafe_allow_html=True)
-                st.markdown("<p style='text-align: center; font-size: 10px; font-weight: bold; color: #a0aec0; text-transform: uppercase;'>Rechenweg:</p>", unsafe_allow_html=True)
-                for step in range(num_steps):
-                    cols_step = st.columns(num_cols)
-                    for i in range(num_cols):
-                        with cols_step[i]:
-                            st.text_input("", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
+            # Scratchpad (Treppenform)
+            num_steps = len(n1_str) * 2
+            st.markdown("<div style='width: 100%; max-width: " + str(max_cols * 4) + "rem; align-self: flex-start; margin-top: 10px;'>", unsafe_allow_html=True)
+
+            for step in range(num_steps):
+                cols_step = st.columns(max_cols)
+                for i in range(max_cols):
+                    with cols_step[i]:
+                        st.text_input(f"step_{step}_{i}", key=f"step{step}_{i}", max_chars=1, label_visibility="collapsed")
+                # Add line after subtractions
+                if step % 2 == 1 and step < num_steps - 1:
+                    st.markdown("<div class='hr-line' style='width: 50%; margin-left: 0;'></div>", unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -129,22 +152,21 @@ def render_math_grid():
     const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
 
     inputs.forEach((input, index) => {{
-        // Remove old listeners to prevent duplicates on rerun
-        const new_input = input.cloneNode(true);
-        input.parentNode.replaceChild(new_input, input);
+        if (!input.dataset.listenerAttached) {{
+            input.dataset.listenerAttached = 'true';
+            input.addEventListener('input', function(e) {{
+                if (this.value.length >= 1) {{
+                    let nextIndex = '{js_direction}' === 'rtl' ? index - 1 : index + 1;
 
-        new_input.addEventListener('input', function(e) {{
-            if (this.value.length >= 1) {{
-                let nextIndex = '{js_direction}' === 'rtl' ? index - 1 : index + 1;
-
-                if (nextIndex >= 0 && nextIndex < inputs.length) {{
-                    let nextInput = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])')[nextIndex];
-                    if (nextInput) {{
-                        nextInput.focus();
+                    if (nextIndex >= 0 && nextIndex < inputs.length) {{
+                        let nextInput = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])')[nextIndex];
+                        if (nextInput) {{
+                            nextInput.focus();
+                        }}
                     }}
                 }}
-            }}
-        }});
+            }});
+        }}
     }});
     </script>
     """
@@ -214,33 +236,44 @@ def check_answer():
     current_task = st.session_state.math_tasks[0]
     ans_digits = len(str(current_task['correct']))
 
+    ans_str_correct = str(current_task['correct'])
+
     # Build answer string from individual input fields
     # Make sure we don't accidentally pull empty strings out and concatenate
     answer_parts = []
     has_empty = False
+    wrong_indices = []
 
     for i in range(ans_digits):
         val = st.session_state.get(f"result_{i}", "")
         # Remove non-digits just in case
         import re
         val = re.sub(r'[^\d]', '', val)
+
         if val:
             answer_parts.append(val)
+            if val != ans_str_correct[i]:
+                wrong_indices.append(i)
         else:
             has_empty = True
+            wrong_indices.append(i)
 
     answer_str = "".join(answer_parts)
 
-    if not answer_str:
+    if has_empty:
         st.toast("Bitte trage ein Ergebnis ein!", icon="⚠️")
         return
 
-    user_ans = int(answer_str)
+    user_ans = -1
+    try:
+        user_ans = int(answer_str)
+    except ValueError:
+        pass
 
     # Calculate score metrics
     st.session_state.math_total_digits_count += len(str(current_task['correct']))
 
-    if user_ans == current_task['correct']:
+    if len(wrong_indices) == 0 and user_ans == current_task['correct']:
         st.session_state.math_total_score += len(str(current_task['correct']))
         st.session_state.math_correct_digits_count += len(str(current_task['correct']))
         st.session_state.math_last_check_failed = False
@@ -252,15 +285,29 @@ def check_answer():
         st.error(f"Falsch! Das korrekte Ergebnis wäre: {current_task['correct']}")
         st.session_state.math_last_check_failed = True
 
-        # Inject JS to visually mark input fields as wrong
-        error_js = """
+        # Inject JS to visually mark ONLY wrong result input fields
+        wrong_indices_js = str(wrong_indices)
+        error_js = f"""
         <script>
-            const inputs = window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])');
-            inputs.forEach(input => {
-                input.style.backgroundColor = '#fee2e2';
-                input.style.borderColor = '#ef4444';
-                input.style.color = '#991b1b';
-            });
+            const inputs = window.parent.document.querySelectorAll('input[type="text"][aria-label^="res_"]');
+            const wrongIndices = {wrong_indices_js};
+            inputs.forEach((input, index) => {{
+                // Extract original index from aria-label which matches "res_i"
+                const ariaLabel = input.getAttribute('aria-label');
+                if (ariaLabel) {{
+                    const idxStr = ariaLabel.split('_')[1];
+                    const idx = parseInt(idxStr);
+                    if (wrongIndices.includes(idx)) {{
+                        input.style.backgroundColor = '#fee2e2';
+                        input.style.borderColor = '#ef4444';
+                        input.style.color = '#991b1b';
+                    }} else {{
+                        input.style.backgroundColor = '#f0fdf4';
+                        input.style.borderColor = '#22c55e';
+                        input.style.color = '#166534';
+                    }}
+                }}
+            }});
         </script>
         """
         components.html(error_js, height=0)
