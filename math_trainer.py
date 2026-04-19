@@ -33,15 +33,26 @@ def init_math_state():
         st.session_state.math_best_es = 0
     if 'math_game_id' not in st.session_state:
         st.session_state.math_game_id = 0
+    if 'math_total_time' not in st.session_state:
+        st.session_state.math_total_time = 16
+    if 'math_custom_digits_1' not in st.session_state:
+        st.session_state.math_custom_digits_1 = 3
+    if 'math_custom_digits_2' not in st.session_state:
+        st.session_state.math_custom_digits_2 = 2
 
 difficulty_settings = {
     'easy': {'label': 'Leicht', 'desc': '3-stellig × 1-stellig | Div: 3-stellig ÷ 1-stellig', 'range1': [100, 999], 'range2': [2, 9]},
     'medium': {'label': 'Mittel', 'desc': '4-stellig × 2-stellig | Div: 5-stellig ÷ 1-stellig', 'range1': [1000, 9999], 'range2': [11, 99]},
-    'hard': {'label': 'CEO (Meister)', 'desc': '5-stellig × 2-stellig | Div: 5-stellig ÷ 2-stellig', 'range1': [10000, 99999], 'range2': [11, 99]}
+    'hard': {'label': 'CEO (Meister)', 'desc': '5-stellig × 2-stellig | Div: 5-stellig ÷ 2-stellig', 'range1': [10000, 99999], 'range2': [11, 99]},
+    'custom': {'label': 'Custom / Individual', 'desc': 'Frei wählbare Komplexität'}
 }
 
+def get_range_for_digits(digits):
+    if digits == 1:
+        return [2, 9] # Don't allow 0 or 1 for meaningful arithmetic
+    return [10**(digits-1), (10**digits) - 1]
+
 def generate_math_task():
-    settings = difficulty_settings[st.session_state.math_difficulty]
 
     op_mode = st.session_state.math_operation_mode
     if op_mode == 'Gemischt':
@@ -54,13 +65,30 @@ def generate_math_task():
     st.session_state.math_current_task_type = task_type
     st.session_state.math_current_index += 1
 
+    if st.session_state.math_difficulty == 'custom':
+        range1 = get_range_for_digits(st.session_state.math_custom_digits_1)
+        range2 = get_range_for_digits(st.session_state.math_custom_digits_2)
+    else:
+        settings = difficulty_settings[st.session_state.math_difficulty]
+        range1 = settings['range1']
+        range2 = settings['range2']
+
     if task_type == 'mul':
-        n1 = random.randint(settings['range1'][0], settings['range1'][1])
-        n2 = random.randint(settings['range2'][0], settings['range2'][1])
+        n1 = random.randint(range1[0], range1[1])
+        n2 = random.randint(range2[0], range2[1])
         st.session_state.math_tasks = [{'n1': n1, 'n2': n2, 'correct': n1 * n2, 'type': 'mul'}]
     else:
         # Division logic setup based on difficulty mapping
-        if st.session_state.math_difficulty == 'easy':
+        if st.session_state.math_difficulty == 'custom':
+            # Div: n1-stellig ÷ n2-stellig
+            n2 = random.randint(range2[0], range2[1])
+            n1 = random.randint(range1[0], range1[1])
+            if n2 > n1:
+                n1, n2 = n2, n1 # Ensure n1 is always the larger number for division
+            if n2 == 0: n2 = 1 # Fallback
+            correct = n1 // n2
+            n1 = n2 * correct
+        elif st.session_state.math_difficulty == 'easy':
             n2 = random.randint(2, 9)
             # n1 up to 3 digits (max 999), meaning correct is up to 999/2
             n1 = random.randint(100, 999)
