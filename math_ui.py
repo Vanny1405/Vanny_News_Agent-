@@ -11,15 +11,26 @@ def render_math_setup():
 
     st.info("Rechne die Aufgaben wie in deinem Heft. Trage jede Ziffer in ein eigenes Kästchen ein. Das System fokussiert automatisch das nächste Feld.")
 
+    total_time = st.number_input("Gesamtzeit für das Training (in Minuten):", min_value=2, max_value=120, value=st.session_state.math_total_time, step=2)
+    st.session_state.math_total_time = total_time
+    sprint_duration = total_time // 2
+
     col1, col2 = st.columns(2)
     with col1:
         diff = st.radio("Wähle dein Level:", options=list(difficulty_settings.keys()), format_func=lambda x: f"{difficulty_settings[x]['label']} ({difficulty_settings[x]['desc']})")
         st.session_state.math_difficulty = diff
+
+        if diff == 'custom':
+            d1 = st.slider("Stellen Zahl 1", min_value=1, max_value=10, value=st.session_state.math_custom_digits_1)
+            d2 = st.slider("Stellen Zahl 2", min_value=1, max_value=10, value=st.session_state.math_custom_digits_2)
+            st.session_state.math_custom_digits_1 = d1
+            st.session_state.math_custom_digits_2 = d2
+
     with col2:
         op = st.radio("Operationsmodus:", options=['Gemischt', 'Multiplikation', 'Division'])
         st.session_state.math_operation_mode = op
 
-    if st.button("🚀 SPRINT 1 STARTEN (8 Min)", use_container_width=True):
+    if st.button(f"🚀 SPRINT 1 STARTEN ({sprint_duration} Min)", use_container_width=True):
         start_sprint()
         st.rerun()
 
@@ -70,17 +81,18 @@ def render_math_grid():
         }
         /* Make columns tight for the grid */
         div[data-testid="column"] {
-            min-width: 3rem !important;
-            padding: 0 4px !important;
+            min-width: 1.5rem !important;
+            padding: 0 2px !important;
         }
         /* Merkzahlen styling */
         input[aria-label^="merk_"] {
-            width: 50% !important;
+            width: 60% !important;
             height: 1.5rem !important;
             font-size: 0.8rem !important;
             margin: 0 auto !important;
-            border: 1px solid #e2e8f0 !important;
-            background-color: #f8fafc !important;
+            border: 1px solid #6366f1 !important;
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -261,8 +273,9 @@ def render_math_grid():
 
 
 def render_math_sprint():
+    sprint_duration_minutes = st.session_state.math_total_time // 2
     elapsed = time.time() - st.session_state.math_sprint_start_time
-    remaining = max(0, 8 * 60 - elapsed)
+    remaining = max(0, sprint_duration_minutes * 60 - elapsed)
 
     mins, secs = divmod(int(remaining), 60)
     st.markdown(f"<div style='text-align: right; font-family: monospace; font-size: 1.2rem; color: #4a5568;'>⏳ {mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
@@ -401,6 +414,7 @@ def check_answer():
         components.html(error_js, height=0)
 
 def render_math_break():
+    sprint_duration_minutes = st.session_state.math_total_time // 2
     st.markdown("<div class='math-container' style='text-align: center; padding: 40px;'>", unsafe_allow_html=True)
     import random
     quotes = [
@@ -412,7 +426,7 @@ def render_math_break():
     st.markdown(f"<p style='font-size: 1.2rem; font-style: italic; color: #4a5568;'>{random.choice(quotes)}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.button("🚀 SPRINT 2 STARTEN (8 Min)", use_container_width=True, type="primary"):
+    if st.button(f"🚀 SPRINT 2 STARTEN ({sprint_duration_minutes} Min)", use_container_width=True, type="primary"):
         st.session_state.math_sprint_num = 2
         start_sprint()
         st.rerun()
