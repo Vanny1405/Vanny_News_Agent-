@@ -3,6 +3,11 @@ import time
 import streamlit as st
 
 def init_math_state():
+    # Estimation State
+    if 'estimation_state' not in st.session_state:
+        st.session_state.estimation_state = 'setup' # 'setup', 'theory', 'sprint', 'results'
+
+    # Math Sprint State
     if 'math_game_state' not in st.session_state:
         st.session_state.math_game_state = 'setup' # 'setup', 'sprint_1', 'break', 'sprint_2', 'results'
     if 'math_difficulty' not in st.session_state:

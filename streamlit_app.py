@@ -172,7 +172,7 @@ if 'last_analysis_result' not in st.session_state:
 # 4. SIDEBAR (NAVIGATION & KONFIGURATION)
 with st.sidebar:
     st.title("🧭 Navigation")
-    app_mode = st.radio("Wähle ein Modul:", ["📰 News-Monitor", "🧠 Brain Training"])
+    app_mode = st.radio("Wähle ein Modul:", ["📰 News-Monitor", "🧠 Brain Training", "📈 Überschlagsrechnen"])
 
     st.divider()
     
@@ -339,5 +339,9 @@ if app_mode == "📰 News-Monitor":
 elif app_mode == "🧠 Brain Training":
     from math_ui import render_brain_training
     render_brain_training()
+
+elif app_mode == "📈 Überschlagsrechnen":
+    from estimation_ui import render_estimation_training
+    render_estimation_training()
 
 # Trigger Deploy 1776593261
