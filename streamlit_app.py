@@ -171,7 +171,7 @@ if 'last_analysis_result' not in st.session_state:
 
 # 4. SIDEBAR (NAVIGATION & KONFIGURATION)
 with st.sidebar:
-    st.title("🧭 Navigator")    
+    st.title("🧭 Navigation")
     app_mode = st.radio("Wähle ein Modul:", ["📰 News-Monitor", "🧠 Brain Training"])
 
     st.divider()
@@ -341,3 +341,9 @@ elif app_mode == "🧠 Brain Training":
     render_brain_training()
 
 # Trigger Deploy 1776593261
+
+# Restart Server 1776622417
+
+# Restart Server 1776623405
+
+# Restart Server 1776623627

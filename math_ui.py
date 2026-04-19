@@ -27,10 +27,50 @@ def render_math_setup():
             st.session_state.math_custom_digits_2 = d2
 
     with col2:
-        op = st.radio("Operationsmodus:", options=['Gemischt', 'Multiplikation', 'Division'])
-        st.session_state.math_operation_mode = op
+        modes = st.multiselect("Operationsmodus:", options=['Multiplikation', 'Division', 'Überschlagsrechnen'], default=st.session_state.math_operation_modes)
+        st.session_state.math_operation_modes = modes
+
+        if 'Division' in modes:
+            div_rest = st.checkbox("Division mit Rest", value=st.session_state.math_div_rest)
+            st.session_state.math_div_rest = div_rest
 
     if st.button(f"🚀 SPRINT 1 STARTEN ({sprint_duration} Min)", use_container_width=True):
+        if 'Überschlagsrechnen' in modes:
+            st.session_state.math_game_state = 'theory'
+        else:
+            start_sprint()
+        st.rerun()
+
+def render_math_theory():
+    st.components.v1.html("""
+    <style>body { font-family: sans-serif; }</style>
+
+    <div style='text-align: center; margin-bottom: 20px;'>
+        <h1 style='color: #4f46e5;'>🧠 Theorie: Überschlagsrechnen</h1>
+        <p style='font-size: 1.2rem;'>So rundest du richtig!</p>
+    </div>
+
+    <div style='background-color: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;'>
+        <h3>Rundungs-Regeln (Grundschule)</h3>
+        <p>Bevor du einen Überschlag machst, musst du die Zahlen runden, damit sie leichter zu rechnen sind. Schau dir immer die Stelle an, auf die du runden willst. Schau dann auf den <strong>rechten Nachbarn</strong>:</p>
+
+        <ul style='font-size: 1.1rem; list-style-type: none; padding-left: 0;'>
+            <li style='margin-bottom: 10px;'>⬇️ <strong>Abrunden bei:</strong> <span style='background-color: #fee2e2; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>0, 1, 2, 3, 4</span> -> Die Zahl bleibt gleich, der Rest wird zu Nullen.</li>
+            <li>⬆️ <strong>Aufrunden bei:</strong> <span style='background-color: #dcfce3; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>5, 6, 7, 8, 9</span> -> Die Zahl wird um 1 größer, der Rest wird zu Nullen.</li>
+        </ul>
+
+        <div style='background-color: #e0e7ff; padding: 15px; border-radius: 8px; margin-top: 15px;'>
+            <strong>Beispiel:</strong><br>
+            Du sollst rechnen: 382 &times; 7<br>
+            Wir runden 382 auf den Hunderter. Der Nachbar von 3 ist die 8. Also runden wir auf!<br>
+            Aus 382 wird also <strong>400</strong>.<br><br>
+            Der einfache Überschlag ist dann: 400 &times; 7 = 2.800.
+        </div>
+    </div>
+
+    """, height=500)
+
+    if st.button("✅ Verstanden – Sprint starten!", use_container_width=True, type="primary"):
         start_sprint()
         st.rerun()
 
@@ -86,7 +126,7 @@ def render_math_grid():
         }
         /* Ersetze das bisherige Merkzahlen-Styling durch diesen spezifischen Block */
         div[data-testid="stTextInput"] > div > div > input[aria-label^="merk_"] {
-            background-color: #1e293b !important; /* Dunkles Blau-Grau */
+            background-color: #334155 !important; /* Dunkles Grau-Blau für garantierten Kontrast */
             color: #ffffff !important;           /* Weißer Text */
             border: 1px solid #6366f1 !important; /* Indigo Rahmen */
             -webkit-text-fill-color: #ffffff !important;
@@ -95,6 +135,24 @@ def render_math_grid():
             height: 1.5rem !important;
             font-size: 0.8rem !important;
             margin: 0 auto !important;
+        }
+
+        /* Bento Card Styling for Estimation */
+        .bento-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .task-text {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #1e293b;
+            font-family: 'Roboto Mono', monospace;
+            letter-spacing: 2px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -107,7 +165,19 @@ def render_math_grid():
     with st.container():
         st.markdown("<div class='math-container'>", unsafe_allow_html=True)
 
-        if task_type == 'mul':
+        if task_type == 'est':
+            st.markdown(f"""
+                <div class='bento-card'>
+                    <p style='color: #64748b; font-size: 1.1rem; margin-bottom: 10px;'>Überschlage im Kopf:</p>
+                    <div class='task-text'>{n1_str} × {n2_str}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Simple text input for estimation instead of grid
+            st.text_input("Dein Überschlag:", key=f"est_result_{game_id}", placeholder="Hier eintragen...")
+            return # Skip rendering the rest of the JS/grid logic
+
+        elif task_type == 'mul':
             max_cols = max(len(n1_str) + len(n2_str) + 1, len(ans_str) + 1)
 
             st.markdown(f"<div class='task-text'>{n1_str} × {n2_str}</div>", unsafe_allow_html=True)
@@ -161,6 +231,15 @@ def render_math_grid():
                 with top_cols[i+1]:
                     st.text_input(f"res_{i}_{game_id}", key=f"result_{i}_{game_id}", max_chars=1, label_visibility="collapsed")
 
+            if st.session_state.math_div_rest:
+                st.markdown("<p style='font-size: 12px; color: #64748b; margin-top: 5px; margin-bottom: 0;'>Rest (R):</p>", unsafe_allow_html=True)
+                # Determine max digits for remainder (could be up to len(n2) but realistically small)
+                rem_digits = len(n2_str)
+                rem_cols = st.columns([max_cols + 2] + [1]*rem_digits)
+                for i in range(rem_digits):
+                    with rem_cols[i+1]:
+                        st.text_input(f"rem_{i}_{game_id}", key=f"result_rem_{i}_{game_id}", max_chars=1, label_visibility="collapsed")
+
             # Scratchpad (Treppenform)
             num_steps = len(n1_str) * 2
             st.markdown("<div style='width: 100%; max-width: " + str(max_cols * 4) + "rem; align-self: flex-start; margin-top: 10px;'>", unsafe_allow_html=True)
@@ -190,9 +269,10 @@ def render_math_grid():
     # Inject JavaScript for Operation-Specific Focus Flow
     js_code = f"""
     <script>
-    const inputs = Array.from(window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])'));
+    setTimeout(() => {{
+        const inputs = Array.from(window.parent.document.querySelectorAll('input[type="text"]:not([data-testid="stChatInput"])'));
 
-    function jumpToNext(input, direction) {{
+        function jumpToNext(input, direction) {{
         // We only care about jumping logic for step and merk fields if needed
         // For standard "res_" fields at the bottom or basic inputs, use normal directional hopping
         const label = input.getAttribute('aria-label') || "";
@@ -269,9 +349,10 @@ def render_math_grid():
             }});
         }}
     }});
+    }}, 100);
     </script>
     """
-    components.html(js_code, height=0)
+    components.html(js_code, height=0, key=f"focus_js_{game_id}")
 
 
 def render_math_sprint():
@@ -336,21 +417,45 @@ def render_math_sprint():
 
 def check_answer():
     current_task = st.session_state.math_tasks[0]
-    ans_digits = len(str(current_task['correct']))
+    task_type = current_task.get('type', 'mul')
     game_id = st.session_state.math_game_id
 
+    if task_type == 'est':
+        user_val = st.session_state.get(f"est_result_{game_id}", "")
+        try:
+            user_ans = int(user_val.strip())
+            ideal = current_task['correct']
+            lower_bound = ideal * 0.85
+            upper_bound = ideal * 1.15
+
+            st.session_state.math_total_digits_count += len(str(ideal)) # Weight roughly
+
+            if lower_bound <= user_ans <= upper_bound:
+                st.session_state.math_total_score += len(str(ideal))
+                st.session_state.math_correct_digits_count += len(str(ideal))
+                st.session_state.math_last_check_failed = False
+                st.toast(f"✅ Klasse! (Ideal: {ideal})")
+                time.sleep(0.5)
+                generate_math_task()
+                st.rerun()
+            else:
+                st.error(f"❌ Zu weit weg. Idealer Überschlag war: {ideal}")
+                st.session_state.math_last_check_failed = True
+        except ValueError:
+            st.toast("Bitte gib eine gültige Zahl ein!", icon="⚠️")
+        return
+
+    ans_digits = len(str(current_task['correct']))
     ans_str_correct = str(current_task['correct'])
 
     # Build answer string from individual input fields
-    # Make sure we don't accidentally pull empty strings out and concatenate
     answer_parts = []
     has_empty = False
     wrong_indices = []
 
+    import re
     for i in range(ans_digits):
         val = st.session_state.get(f"result_{i}_{game_id}", "")
-        # Remove non-digits just in case
-        import re
         val = re.sub(r'[^\d]', '', val)
 
         if val:
@@ -363,8 +468,38 @@ def check_answer():
 
     answer_str = "".join(answer_parts)
 
+    # Check remainder if applicable
+    rem_correct = True
+    rem_wrong_indices = []
+    if task_type == 'div' and st.session_state.get('math_div_rest', False):
+        rem_str_correct = str(current_task.get('correct_rem', 0))
+        rem_digits = len(str(current_task['n2'])) # Same logic as UI
+
+        rem_parts = []
+        # Pad correct remainder string with leading zeros to match fields
+        padded_rem_correct = rem_str_correct.zfill(rem_digits)
+
+        for i in range(rem_digits):
+            val = st.session_state.get(f"result_rem_{i}_{game_id}", "")
+            val = re.sub(r'[^\d]', '', val)
+            if val:
+                rem_parts.append(val)
+                if val != padded_rem_correct[i]:
+                    rem_wrong_indices.append(i)
+                    rem_correct = False
+            else:
+                rem_wrong_indices.append(i)
+                rem_correct = False
+                if padded_rem_correct[i] != '0': # Empty is only ok if the expected padded digit is 0
+                    has_empty = True
+                else:
+                    # Treat empty as 0 if expected is 0
+                    rem_parts.append('0')
+                    rem_wrong_indices.remove(i)
+                    rem_correct = True # temp fix for this digit
+
     if has_empty:
-        st.toast("Bitte trage ein Ergebnis ein!", icon="⚠️")
+        st.toast("Bitte trage ein Ergebnis (und ggf. Rest) ein!", icon="⚠️")
         return
 
     user_ans = -1
@@ -373,10 +508,11 @@ def check_answer():
     except ValueError:
         pass
 
-    # Calculate score metrics
     st.session_state.math_total_digits_count += len(str(current_task['correct']))
+    if task_type == 'div' and st.session_state.get('math_div_rest', False):
+         st.session_state.math_total_digits_count += 1 # extra point for remainder
 
-    if len(wrong_indices) == 0 and user_ans == current_task['correct']:
+    if len(wrong_indices) == 0 and user_ans == current_task['correct'] and rem_correct:
         st.session_state.math_total_score += len(str(current_task['correct']))
         st.session_state.math_correct_digits_count += len(str(current_task['correct']))
         st.session_state.math_last_check_failed = False
@@ -385,11 +521,15 @@ def check_answer():
         generate_math_task()
         st.rerun()
     else:
-        st.error(f"Falsch! Das korrekte Ergebnis wäre: {current_task['correct']}")
+        err_msg = f"Falsch! Das korrekte Ergebnis wäre: {current_task['correct']}"
+        if task_type == 'div' and st.session_state.get('math_div_rest', False):
+             err_msg += f" Rest {current_task.get('correct_rem', 0)}"
+        st.error(err_msg)
         st.session_state.math_last_check_failed = True
 
         # Inject JS to visually mark ONLY wrong result input fields
         wrong_indices_js = str(wrong_indices)
+        rem_wrong_indices_js = str(rem_wrong_indices) if task_type == 'div' else "[]"
         error_js = f"""
         <script>
             const inputs = window.parent.document.querySelectorAll('input[type="text"][aria-label^="res_"]');
@@ -401,6 +541,26 @@ def check_answer():
                     const idxStr = ariaLabel.split('_')[1];
                     const idx = parseInt(idxStr);
                     if (wrongIndices.includes(idx)) {{
+                        input.style.backgroundColor = '#fee2e2';
+                        input.style.borderColor = '#ef4444';
+                        input.style.color = '#991b1b';
+                    }} else {{
+                        input.style.backgroundColor = '#f0fdf4';
+                        input.style.borderColor = '#22c55e';
+                        input.style.color = '#166534';
+                    }}
+                }}
+            }});
+
+            // Mark remainder inputs if any
+            const remInputs = window.parent.document.querySelectorAll('input[type="text"][aria-label^="rem_"]');
+            const remWrongIndices = {rem_wrong_indices_js};
+            remInputs.forEach((input, index) => {{
+                const ariaLabel = input.getAttribute('aria-label');
+                if (ariaLabel) {{
+                    const idxStr = ariaLabel.split('_')[1];
+                    const idx = parseInt(idxStr);
+                    if (remWrongIndices.includes(idx)) {{
                         input.style.backgroundColor = '#fee2e2';
                         input.style.borderColor = '#ef4444';
                         input.style.color = '#991b1b';
@@ -480,6 +640,8 @@ def render_brain_training():
 
     if state == 'setup':
         render_math_setup()
+    elif state == 'theory':
+        render_math_theory()
     elif state in ['sprint_1', 'sprint_2']:
         render_math_sprint()
     elif state == 'break':
