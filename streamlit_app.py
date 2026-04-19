@@ -339,3 +339,5 @@ if app_mode == "📰 News-Monitor":
 elif app_mode == "🧠 Brain Training":
     from math_ui import render_brain_training
     render_brain_training()
+
+# Trigger Deploy 1776593261

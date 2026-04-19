@@ -84,15 +84,17 @@ def render_math_grid():
             min-width: 1.5rem !important;
             padding: 0 2px !important;
         }
-        /* Merkzahlen styling */
-        input[aria-label^="merk_"] {
+        /* Ersetze das bisherige Merkzahlen-Styling durch diesen spezifischen Block */
+        div[data-testid="stTextInput"] > div > div > input[aria-label^="merk_"] {
+            background-color: #1e293b !important; /* Dunkles Blau-Grau */
+            color: #ffffff !important;           /* Weißer Text */
+            border: 1px solid #6366f1 !important; /* Indigo Rahmen */
+            -webkit-text-fill-color: #ffffff !important;
+            opacity: 1 !important;
             width: 60% !important;
             height: 1.5rem !important;
             font-size: 0.8rem !important;
             margin: 0 auto !important;
-            border: 1px solid #6366f1 !important;
-            background-color: #1e293b !important;
-            color: #f8fafc !important;
         }
         </style>
     """, unsafe_allow_html=True)
